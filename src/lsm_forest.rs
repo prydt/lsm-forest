@@ -48,6 +48,26 @@ pub mod lsm_forest {
         memtable: BTreeMap<K, Option<V>>,
     }
 
+    /// LSM Tree
+    impl<K: LogSerial, V: LogSerial> LSMTree<K, V> {
+        /// Create a new LSM Tree
+        fn new() -> LSMTree<K, V> {
+            todo!()
+        }
+
+        fn get(&self, key: K) -> Option<V> {
+            todo!()
+        }
+
+        fn put(&mut self, key: K, value: V) {
+            todo!()
+        }
+
+        fn remove(&mut self, key: K) {
+            todo!()
+        }
+    }
+
     trait TableManager<K: LogSerial, V: LogSerial> {
         fn new() -> Self;
         fn add_table(lsm: LSMTree<K, V>);
