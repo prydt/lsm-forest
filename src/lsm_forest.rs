@@ -1,35 +1,71 @@
-use bincode::{Decode, Encode};
-
 pub mod lsm_forest {
-    use std::{collections::BTreeMap, fs::File};
+    use anyhow::Result;
+    use bincode::{Decode, Encode};
+    use std::{
+        collections::BTreeMap,
+        fs::{self, File},
+        hash::Hash,
+        path::Path,
+    };
 
-    struct LogFile<K, V> {
+    trait LogSerial = Encode + Decode + Hash + Ord + 'static;
+
+    struct Log {
         file: File,
     }
 
-    #[derive(Encode, Decode, Ord, Debug)]
-    struct LogEntry<
-    K: Encode + Decode + Hash + Ord + 'static,
-    V: Encode + Decode + Hash + Ord + 'static,
-
-    >{
+    #[derive(Encode, Decode, Debug)]
+    struct LogEntry<K: LogSerial, V: LogSerial> {
+        crc: u32,
+        is_delete: bool,
+        key: K,
+        value: V,
     }
 
-    struct LSMTree<K, V> {
-        memtable: BTreeMap<K, V>,
-    }
+    impl Log {
+        fn new(path: &Path) -> Log {
+            let file = fs::OpenOptions::new()
+                .create(true)
+                .read(true)
+                .write(true)
+                .open(path)
+                .unwrap();
 
-    impl<K, V> LSMTree<K, V> {
-        fn new() -> Self {
-            LSMTree {
-                memtable: BTreeMap::new(),
-            }
+            Log { file }
+        }
+
+        fn append<K: LogSerial, V: LogSerial>(entry: LogEntry<K, V>) -> bool {
+            todo!()
+        }
+
+        fn recovery<K: LogSerial, V: LogSerial>() -> BTreeMap<K, V> {
+            todo!()
         }
     }
 
-    trait TableManager<K, V> {
-        fn get(&self, key: K) -> Option<V>;
-        fn put(&mut self, key: K, value: V);
-        fn delete(&mut self, key: K);
+    struct LSMTree<K, V> {
+        wal: Log,
+        memtable: BTreeMap<K, Option<V>>,
     }
+
+    trait TableManager<K: LogSerial, V: LogSerial> {
+        fn new() -> Self;
+        fn add_table(lsm: LSMTree<K, V>);
+        fn read(key: K) -> Option<V>;
+        fn should_flush(lsm: LSMTree<K, V>) -> bool;
+    }
+
+    // impl<K, V> LSMTree<K, V> {
+    //     fn new() -> Self {
+    //         LSMTree {
+    //             memtable: BTreeMap::new(),
+    //         }
+    //     }
+    // }
+
+    // trait TableManager<K, V> {
+    //     fn get(&self, key: K) -> Option<V>;
+    //     fn put(&mut self, key: K, value: V);
+    //     fn delete(&mut self, key: K);
+    // }
 }

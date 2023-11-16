@@ -1,3 +1,4 @@
+#![feature(trait_alias)]
 mod lsm_forest;
 
 pub fn add(left: usize, right: usize) -> usize {
