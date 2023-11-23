@@ -5,8 +5,10 @@ pub mod lsm_forest {
         collections::BTreeMap,
         fs::{self, File},
         hash::Hash,
-        path::Path,
+        path::Path, io::BufReader,
     };
+    use std::io::Write;
+    use crc32fast;
 
     trait LogSerial = Encode + Decode + Hash + Ord + 'static;
 
@@ -22,6 +24,17 @@ pub mod lsm_forest {
         value: V,
     }
 
+    impl<K: LogSerial,V: LogSerial> LogEntry<K, V> {
+        fn check_crc(&self) -> bool {
+            let mut hasher = crc32fast::Hasher::new();
+            hasher.update(if self.is_delete {&[1]} else { &[0]});
+
+
+            todo!()
+        }
+    }
+
+
     impl Log {
         fn new(path: &Path) -> Log {
             let file = fs::OpenOptions::new()
@@ -34,11 +47,21 @@ pub mod lsm_forest {
             Log { file }
         }
 
-        fn append<K: LogSerial, V: LogSerial>(entry: LogEntry<K, V>) -> bool {
-            todo!()
+        fn append<K: LogSerial, V: LogSerial>(&mut self, entry: LogEntry<K, V>) -> Result<()> {
+            let payload = bincode::encode_to_vec(entry, bincode::config::standard())?;
+            self.file.write(&payload)?;
+            self.file.flush()?;
+
+            Ok(())
         }
 
-        fn recovery<K: LogSerial, V: LogSerial>() -> BTreeMap<K, V> {
+        fn recovery<K: LogSerial, V: LogSerial>(&mut self) -> Result<BTreeMap<K, V>> {
+            let mut reader = BufReader::new(&self.file);
+
+            while let Ok(entry) = bincode::decode_from_reader::<LogEntry<K,V>, &mut BufReader<&File>, _>(&mut reader, bincode::config::standard()) {
+                // TODO
+            }
+
             todo!()
         }
     }
