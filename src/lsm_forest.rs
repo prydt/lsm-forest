@@ -17,8 +17,8 @@ pub trait LogSerial = Encode + Decode + Hash + Ord + 'static + Debug;
 
 
 pub struct LSMTree<K, V> {
-    wal: Log,
-    memtable: BTreeMap<K, Option<V>>,
+    pub wal: Log,
+    pub memtable: BTreeMap<K, Option<V>>,
 }
 
 /// LSM Tree

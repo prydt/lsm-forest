@@ -107,6 +107,72 @@ mod tests {
         fs::remove_dir_all(p).unwrap();
     }
 
+    #[test]
+    fn test_simple_tm_add_table() {
+        let p = Path::new("test/test_simple_tm_add_table");
+
+        fs::remove_dir_all(p);
+        fs::create_dir(p);
+
+        let mut tm = SimpleTableManager::<String, String>::new(p);
+        let mut memtable = BTreeMap::new();
+
+        for i in 0..100 {
+            let key = format!("key{}", i);
+            let value = format!("value{}", i);
+            let value_opt = Some(value.clone());
+            memtable.insert(key.clone(), value_opt.clone());
+        }
+
+        
+
+        assert_eq!(tm.add_table(memtable.clone()).unwrap(), ());
+        assert_eq!(tm.sstables.len(), 1);
+        assert!(tm.sstables[0].exists());
+
+        let f = File::open(tm.sstables[0].clone()).unwrap();
+        let mut reader = BufReader::new(&f);
+        while let Ok(entry) = bincode::decode_from_reader::<SimpleTableEntry<String,String>, &mut BufReader<&File>, _>(&mut reader, bincode::config::standard()) {
+            assert_eq!(entry.value, memtable.get(&entry.key).unwrap().clone());
+        }
+    }
+
+    #[test]
+    fn test_simple_tm_should_flush() {
+        let p = Path::new("test/test_simple_tm_should_flush");
+
+        fs::remove_dir_all(p);
+        fs::create_dir(p);
+
+        let mut tm = SimpleTableManager::<String, String>::new(p);
+        let mut memtable = BTreeMap::new();
+
+        assert_eq!(tm.should_flush(LSMTree { wal: Log{ file: File::create(p.join("temp")).unwrap()}, memtable: memtable.clone() }), false);
+
+        for i in 0..63 {
+            let key = format!("key{}", i);
+            let value = format!("value{}", i);
+            let value_opt = Some(value.clone());
+            memtable.insert(key.clone(), value_opt.clone());
+
+            println!("{} {}" , i, memtable.len());
+            assert_eq!(tm.should_flush(LSMTree { wal: Log{ file: File::create(p.join("temp")).unwrap()}, memtable: memtable.clone() }), false);
+        }
+
+
+
+        for i in 64..200 {
+            let key = format!("key{}", i);
+            let value = format!("value{}", i);
+            let value_opt = Some(value.clone());
+            memtable.insert(key.clone(), value_opt.clone());
+        
+            assert_eq!(tm.should_flush(LSMTree { wal: Log{ file: File::create(p.join("temp")).unwrap()}, memtable: memtable.clone() }), true);
+        }
+
+        
+    }
+
     //      fillseq       -- write N values in sequential key order in async mode
     //      fillrandom    -- write N values in random key order in async mode
     //      overwrite     -- overwrite N values in random key order in async mode

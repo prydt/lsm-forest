@@ -1,9 +1,12 @@
 use crate::{log::*, lsm_forest::LSMTree};
 use anyhow::Result;
+use bincode::{Encode, Decode};
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::fs::{self, File};
 use std::collections::BTreeMap;
+use std::time::SystemTime;
+use std::io::Write;
 
 pub trait TableManager<K: LogSerial, V: LogSerial> {
     fn new(p: &Path) -> Self;
@@ -17,6 +20,13 @@ pub struct SimpleTableManager<K: LogSerial, V: LogSerial> {
     pub sstables: Vec<PathBuf>,
     pub path: PathBuf,
     phantom: std::marker::PhantomData<(K, V)>,
+}
+
+#[derive(Encode, Decode, Debug)]
+
+pub struct SimpleTableEntry<K: LogSerial, V: LogSerial> {
+    pub key: K,
+    pub value: Option<V>,
 }
 
 
@@ -43,29 +53,36 @@ impl<K: LogSerial, V: LogSerial> SimpleTableManager<K, V> {
 
     pub fn add_table(&mut self, memtable: BTreeMap<K, Option<V>>) -> Result<()> {
 
-        // let name = format!("sstable_{}.sst", SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis());
-        // let mut file = File::create(self.path.join(name))?;
+        let name = format!("sstable_{}.sst", SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis());
+        let path = self.path.join(&name);
+        self.sstables.push(path.clone());
+        //let mut file = File::create(self.path.join(name))?;
+        let mut file = fs::OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .open(path)?;
 
-        todo!()
-        
+        // let payload = bincode::encode_to_vec(&entry, bincode::config::standard())?;
+        // self.file.write(&payload)?;
+        // // self.file.flush()?;
+        for (key, value) in memtable {
+            let entry = SimpleTableEntry {
+                key,
+                value,
+            };
+            let payload = bincode::encode_to_vec(&entry, bincode::config::standard())?;
+            file.write(&payload)?;   
+        }
+        file.flush()?;
+        Ok(())
     }
-    // fn add_table(&mut self, memtable: BTreeMap<K, Option<V>>) -> Result<()> {
-    //     let mut path = Path::new("data/");
-    //     let mut file = File::create(path.join("test.sst"))?;
-    //     let mut buf = Vec::new();
-    //     for (key, value) in memtable {
-    //         let entry = LogEntry {
-    //             crc: 0,
-    //             key,
-    //             value,
-    //         };
-    //         entry.set_crc();
-    //         buf.write(&entry.encode())?;
-    //     }
-    //     file.write(&buf)?;
-    //     self.sstables.push(file);
-    //     Ok(())
-    // }
+
+    pub fn should_flush(&self, lsm: LSMTree<K, V>) -> bool {
+        lsm.memtable.len() >= 64
+    }
+
+    
 }
 // new: take in path to db, add files to vector
 

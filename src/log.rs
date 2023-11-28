@@ -14,7 +14,7 @@ pub trait LogSerial = Encode + Decode + Hash + Ord + 'static + Debug;
 
 
 pub struct Log {
-    file: File,
+    pub file: File,
 }
 
 #[derive(Encode, Decode, Debug)]
