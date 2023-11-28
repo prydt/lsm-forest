@@ -1,42 +1,53 @@
-pub mod lsm_forest {
     use anyhow::Result;
     use bincode::{Decode, Encode};
     use std::{
         collections::BTreeMap,
         fs::{self, File},
-        hash::Hash,
+        hash::{Hash, DefaultHasher, Hasher},
         path::Path, io::BufReader,
     };
     use std::io::Write;
     use crc32fast;
+    use core::fmt::Debug;
 
-    trait LogSerial = Encode + Decode + Hash + Ord + 'static;
+    pub trait LogSerial = Encode + Decode + Hash + Ord + 'static + Debug;
 
-    struct Log {
+    pub struct Log {
         file: File,
     }
 
     #[derive(Encode, Decode, Debug)]
-    struct LogEntry<K: LogSerial, V: LogSerial> {
-        crc: u32,
-        is_delete: bool,
-        key: K,
-        value: V,
+    pub struct LogEntry<K: LogSerial , V: LogSerial> {
+        pub crc: u32,
+        // pub is_delete: bool,
+        pub key: K,
+        pub value: V,
     }
 
-    impl<K: LogSerial,V: LogSerial> LogEntry<K, V> {
-        fn check_crc(&self) -> bool {
+    impl<K: LogSerial,V: LogSerial> LogEntry<K, Option<V>> {
+        pub fn compute_crc(&self) -> u32 {
             let mut hasher = crc32fast::Hasher::new();
-            hasher.update(if self.is_delete {&[1]} else { &[0]});
+            let mut h = DefaultHasher::new();
+            // self.is_delete.hash(&mut h);
+            self.key.hash(&mut h);
+            self.value.hash(&mut h);
+            hasher.update(&h.finish().to_le_bytes());
 
+            hasher.finalize()
+        }
 
-            todo!()
+        pub fn check_crc(&self) -> bool {
+            self.crc == self.compute_crc()
+        }
+
+        pub fn set_crc(&mut self) {
+            self.crc = self.compute_crc();
         }
     }
 
 
     impl Log {
-        fn new(path: &Path) -> Log {
+        pub fn new(path: &Path) -> Log {
             let file = fs::OpenOptions::new()
                 .create(true)
                 .read(true)
@@ -47,26 +58,39 @@ pub mod lsm_forest {
             Log { file }
         }
 
-        fn append<K: LogSerial, V: LogSerial>(&mut self, entry: LogEntry<K, V>) -> Result<()> {
-            let payload = bincode::encode_to_vec(entry, bincode::config::standard())?;
+        pub fn append<K: LogSerial, V: LogSerial>(&mut self, entry: LogEntry<K, Option<V>>) -> Result<()> {
+            let payload = bincode::encode_to_vec(&entry, bincode::config::standard())?;
             self.file.write(&payload)?;
             self.file.flush()?;
 
             Ok(())
         }
 
-        fn recovery<K: LogSerial, V: LogSerial>(&mut self) -> Result<BTreeMap<K, V>> {
+        pub fn recovery<K: LogSerial, V: LogSerial>(&mut self) -> Result<BTreeMap<K, Option<V>>> {
             let mut reader = BufReader::new(&self.file);
 
-            while let Ok(entry) = bincode::decode_from_reader::<LogEntry<K,V>, &mut BufReader<&File>, _>(&mut reader, bincode::config::standard()) {
-                // TODO
+            let mut memtable = BTreeMap::new();
+
+            println!("start recovery\n");
+            while let Ok(entry) = bincode::decode_from_reader::<LogEntry<K,Option<V>>, &mut BufReader<&File>, _>(&mut reader, bincode::config::standard()) {
+                println!("entry: {:?}\n", entry);
+                println!("entry v: {:?}\n", entry.value);
+
+                if entry.check_crc() {
+                    // if entry.is_delete {
+                        // memtable.insert(entry.key, None);
+                    // } else {
+                        // memtable.insert(entry.key, Some(entry.value));
+                    // }
+                    memtable.insert(entry.key, entry.value);
+                }
             }
 
-            todo!()
+            Ok(memtable)
         }
     }
 
-    struct LSMTree<K, V> {
+    pub struct LSMTree<K, V> {
         wal: Log,
         memtable: BTreeMap<K, Option<V>>,
     }
@@ -111,4 +135,3 @@ pub mod lsm_forest {
     //     fn put(&mut self, key: K, value: V);
     //     fn delete(&mut self, key: K);
     // }
-}
