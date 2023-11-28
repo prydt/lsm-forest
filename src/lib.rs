@@ -171,6 +171,42 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_tm_read() {
+        let p = Path::new("test/test_tm_read");
+
+        fs::remove_dir_all(p);
+        fs::create_dir(p);
+
+        let mut tm = SimpleTableManager::<String, String>::new(p);
+        let mut memtable = BTreeMap::new();
+
+        for i in 0..100 {
+            let key = format!("key{}", i);
+            let value = format!("value{}", i);
+            let value_opt = Some(value.clone());
+            memtable.insert(key.clone(), value_opt.clone());
+        }
+
+        let mut copy_memtable = memtable.clone();
+        
+        for i in 0..100 {
+            let key = format!("key{}", i);
+            let mut value = copy_memtable.get(&key).unwrap().as_ref().unwrap().clone();
+            value = format!("{}actual", value);
+            copy_memtable.insert(key.clone(), Some(value.clone()));
+            memtable.insert(key.clone(), Some(value.clone()));
+            sleep(Duration::from_millis(1));
+            tm.add_table(copy_memtable.clone());
+            copy_memtable.remove(&key);
+        }
+
+        for i in 0..100 {
+            let key = format!("key{}", i);
+            assert_eq!(tm.read(key.clone()), memtable.get(&key.clone()).unwrap().clone());
+        }
+    }
+
     //      fillseq       -- write N values in sequential key order in async mode
     //      fillrandom    -- write N values in random key order in async mode
     //      overwrite     -- overwrite N values in random key order in async mode

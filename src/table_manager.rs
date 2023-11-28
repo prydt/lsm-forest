@@ -52,7 +52,7 @@ impl<K: LogSerial, V: LogSerial> SimpleTableManager<K, V> {
     }
 
     pub fn add_table(&mut self, memtable: BTreeMap<K, Option<V>>) -> Result<()> {
-
+        
         let name = format!("sstable_{}.sst", SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis());
         let path = self.path.join(&name);
         self.sstables.push(path.clone());
@@ -79,7 +79,9 @@ impl<K: LogSerial, V: LogSerial> SimpleTableManager<K, V> {
     }
 
     pub fn read(&self, key: K) -> Option<V> {
-        for path in &self.sstables {
+        let mut reversed_sstables = self.sstables.clone();
+        reversed_sstables.reverse();
+        for path in &reversed_sstables {
             let f = File::open(path).unwrap();
             let mut reader = std::io::BufReader::new(&f);
             while let Ok(entry) = bincode::decode_from_reader::<SimpleTableEntry<K,V>, &mut std::io::BufReader<&File>, _>(&mut reader, bincode::config::standard()) {
