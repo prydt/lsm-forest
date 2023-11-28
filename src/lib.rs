@@ -169,8 +169,6 @@ mod tests {
         
             assert_eq!(tm.should_flush(LSMTree { wal: Log{ file: File::create(p.join("temp")).unwrap()}, memtable: memtable.clone() }), true);
         }
-
-        
     }
 
     //      fillseq       -- write N values in sequential key order in async mode

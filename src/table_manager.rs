@@ -78,6 +78,19 @@ impl<K: LogSerial, V: LogSerial> SimpleTableManager<K, V> {
         Ok(())
     }
 
+    pub fn read(&self, key: K) -> Option<V> {
+        for path in &self.sstables {
+            let f = File::open(path).unwrap();
+            let mut reader = std::io::BufReader::new(&f);
+            while let Ok(entry) = bincode::decode_from_reader::<SimpleTableEntry<K,V>, &mut std::io::BufReader<&File>, _>(&mut reader, bincode::config::standard()) {
+                if entry.key == key {
+                    return entry.value;
+                }
+            }
+        }
+        None
+    }
+
     pub fn should_flush(&self, lsm: LSMTree<K, V>) -> bool {
         lsm.memtable.len() >= 64
     }
