@@ -207,7 +207,7 @@ mod tests {
         for i in 0..100 {
             let key = format!("key{}", i);
             assert_eq!(
-                tm.read(key.clone()),
+                tm.read(&key),
                 memtable.get(&key.clone()).unwrap().clone()
             );
         }

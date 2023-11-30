@@ -12,7 +12,7 @@ use crate::lsm_forest::LogSerial;
 pub trait TableManager<K: LogSerial, V: LogSerial> {
     fn new(p: &Path) -> Self;
     fn add_table(&mut self, memtable: BTreeMap<K, Option<V>>) -> Result<()>;
-    fn read(&self, key: K) -> Option<V>;
+    fn read(&self, key: &K) -> Option<V>;
     fn should_flush(&self, wal: &Log, memtable: &BTreeMap<K, Option<V>>) -> bool;
 }
 
@@ -85,14 +85,14 @@ impl<K: LogSerial, V: LogSerial> TableManager<K,V> for  SimpleTableManager<K, V>
         Ok(())
     }
 
-    fn read(&self, key: K) -> Option<V> {
+    fn read(&self, key: &K) -> Option<V> {
         // let mut reversed_sstables = self.sstables.clone();
         // reversed_sstables.rev();
         for path in self.sstables.iter().rev() {
             let f = File::open(path).unwrap();
             let mut reader = std::io::BufReader::new(&f);
             while let Ok(entry) = bincode::decode_from_reader::<SimpleTableEntry<K,V>, &mut std::io::BufReader<&File>, _>(&mut reader, bincode::config::standard()) {
-                if entry.key == key {
+                if entry.key == key.clone() {
                     return entry.value;
                 }
             }
