@@ -124,15 +124,18 @@ mod tests {
             memtable.insert(key.clone(), value_opt.clone());
         }
 
-        
-
         assert_eq!(tm.add_table(memtable.clone()).unwrap(), ());
         assert_eq!(tm.sstables.len(), 1);
         assert!(tm.sstables[0].exists());
 
         let f = File::open(tm.sstables[0].clone()).unwrap();
         let mut reader = BufReader::new(&f);
-        while let Ok(entry) = bincode::decode_from_reader::<SimpleTableEntry<String,String>, &mut BufReader<&File>, _>(&mut reader, bincode::config::standard()) {
+        while let Ok(entry) = bincode::decode_from_reader::<
+            SimpleTableEntry<String, String>,
+            &mut BufReader<&File>,
+            _,
+        >(&mut reader, bincode::config::standard())
+        {
             assert_eq!(entry.value, memtable.get(&entry.key).unwrap().clone());
         }
     }
@@ -147,7 +150,9 @@ mod tests {
         let mut tm = SimpleTableManager::<String, String>::new(p);
         let mut memtable = BTreeMap::new();
 
-        assert_eq!(tm.should_flush(LSMTree { wal: Log{ file: File::create(p.join("temp")).unwrap()}, memtable: memtable.clone() }), false);
+        let mut dummy_wal = Log::new(&p.join("temp"));
+
+        assert_eq!(tm.should_flush(&dummy_wal, &memtable), false);
 
         for i in 0..63 {
             let key = format!("key{}", i);
@@ -155,19 +160,17 @@ mod tests {
             let value_opt = Some(value.clone());
             memtable.insert(key.clone(), value_opt.clone());
 
-            println!("{} {}" , i, memtable.len());
-            assert_eq!(tm.should_flush(LSMTree { wal: Log{ file: File::create(p.join("temp")).unwrap()}, memtable: memtable.clone() }), false);
+            println!("{} {}", i, memtable.len());
+            assert_eq!(tm.should_flush(&dummy_wal, &memtable), false);
         }
-
-
 
         for i in 64..200 {
             let key = format!("key{}", i);
             let value = format!("value{}", i);
             let value_opt = Some(value.clone());
             memtable.insert(key.clone(), value_opt.clone());
-        
-            assert_eq!(tm.should_flush(LSMTree { wal: Log{ file: File::create(p.join("temp")).unwrap()}, memtable: memtable.clone() }), true);
+
+            assert_eq!(tm.should_flush(&dummy_wal, &memtable), true);
         }
     }
 
@@ -189,7 +192,7 @@ mod tests {
         }
 
         let mut copy_memtable = memtable.clone();
-        
+
         for i in 0..100 {
             let key = format!("key{}", i);
             let mut value = copy_memtable.get(&key).unwrap().as_ref().unwrap().clone();
@@ -197,16 +200,42 @@ mod tests {
             copy_memtable.insert(key.clone(), Some(value.clone()));
             memtable.insert(key.clone(), Some(value.clone()));
             sleep(Duration::from_millis(1));
-            tm.add_table(copy_memtable.clone());
+            tm.add_table(copy_memtable.clone()).expect("add table failed");
             copy_memtable.remove(&key);
         }
 
         for i in 0..100 {
             let key = format!("key{}", i);
-            assert_eq!(tm.read(key.clone()), memtable.get(&key.clone()).unwrap().clone());
+            assert_eq!(
+                tm.read(key.clone()),
+                memtable.get(&key.clone()).unwrap().clone()
+            );
         }
     }
 
+    #[test]
+    fn test_lsm_tree_new() {
+        // TODO
+    }
+
+    #[test]
+    fn test_lsm_tree_put_get() {
+        let p = Path::new("test/test_lsm_put_get");
+
+        fs::remove_dir_all(p);
+        fs::create_dir(p);
+
+        let mut tm = SimpleTableManager::<String, String>::new(p);
+        let mut lsm =
+            LSMTree::<String, String>::new(p.to_path_buf(), &mut tm);
+
+        for i in 0..4096 {
+            let key = format!("key{}", i);
+            let value = format!("value{}", i);
+            lsm.put(key.clone(), value.clone()).expect("put failed");
+            assert_eq!(lsm.get(&key), Some(value));
+        }
+    }
     //      fillseq       -- write N values in sequential key order in async mode
     //      fillrandom    -- write N values in random key order in async mode
     //      overwrite     -- overwrite N values in random key order in async mode

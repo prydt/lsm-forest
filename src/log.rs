@@ -9,8 +9,7 @@ use std::{
 use std::io::Write;
 use crc32fast;
 use core::fmt::Debug;
-
-pub trait LogSerial = Encode + Decode + Hash + Ord + 'static + Debug;
+use crate::lsm_forest::LogSerial;
 
 
 pub struct Log {
@@ -52,6 +51,7 @@ impl Log {
     pub fn new(path: &Path) -> Log {
         let file = fs::OpenOptions::new()
             .create(true)
+            .truncate(true)
             .read(true)
             .write(true)
             .open(path)

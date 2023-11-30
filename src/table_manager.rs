@@ -7,12 +7,13 @@ use std::fs::{self, File};
 use std::collections::BTreeMap;
 use std::time::SystemTime;
 use std::io::Write;
+use crate::lsm_forest::LogSerial;
 
 pub trait TableManager<K: LogSerial, V: LogSerial> {
     fn new(p: &Path) -> Self;
-    fn add_table(memtable: BTreeMap<K, Option<V>>) -> Result<()>;
-    fn read(key: K) -> Option<V>;
-    fn should_flush(lsm: LSMTree<K, V>) -> bool;
+    fn add_table(&mut self, memtable: BTreeMap<K, Option<V>>) -> Result<()>;
+    fn read(&self, key: K) -> Option<V>;
+    fn should_flush(&self, wal: &Log, memtable: &BTreeMap<K, Option<V>>) -> bool;
 }
 
 pub struct SimpleTableManager<K: LogSerial, V: LogSerial> {
@@ -30,15 +31,21 @@ pub struct SimpleTableEntry<K: LogSerial, V: LogSerial> {
 }
 
 
-impl<K: LogSerial, V: LogSerial> SimpleTableManager<K, V> {
-    pub fn new (p: &Path) -> Self {
+impl<K: LogSerial, V: LogSerial> TableManager<K,V> for  SimpleTableManager<K, V> {
+    fn new (p: &Path) -> Self {
         let mut sstables = Vec::new();
         
         for file in fs::read_dir(p).unwrap() {
             let file = file.unwrap();
             let path = file.path();
-            if (path.extension().unwrap() == "sst") {
-                sstables.push(path);
+
+            match path.extension() {
+                Some(ext) => {
+                    if ext == "sst" {
+                        sstables.push(path);
+                    }
+                },
+                None => {},
             }
         }
 
@@ -51,7 +58,7 @@ impl<K: LogSerial, V: LogSerial> SimpleTableManager<K, V> {
         }
     }
 
-    pub fn add_table(&mut self, memtable: BTreeMap<K, Option<V>>) -> Result<()> {
+    fn add_table(&mut self, memtable: BTreeMap<K, Option<V>>) -> Result<()> {
         
         let name = format!("sstable_{}.sst", SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis());
         let path = self.path.join(&name);
@@ -78,10 +85,10 @@ impl<K: LogSerial, V: LogSerial> SimpleTableManager<K, V> {
         Ok(())
     }
 
-    pub fn read(&self, key: K) -> Option<V> {
-        let mut reversed_sstables = self.sstables.clone();
-        reversed_sstables.reverse();
-        for path in &reversed_sstables {
+    fn read(&self, key: K) -> Option<V> {
+        // let mut reversed_sstables = self.sstables.clone();
+        // reversed_sstables.rev();
+        for path in self.sstables.iter().rev() {
             let f = File::open(path).unwrap();
             let mut reader = std::io::BufReader::new(&f);
             while let Ok(entry) = bincode::decode_from_reader::<SimpleTableEntry<K,V>, &mut std::io::BufReader<&File>, _>(&mut reader, bincode::config::standard()) {
@@ -93,25 +100,10 @@ impl<K: LogSerial, V: LogSerial> SimpleTableManager<K, V> {
         None
     }
 
-    pub fn should_flush(&self, lsm: LSMTree<K, V>) -> bool {
-        lsm.memtable.len() >= 64
+    fn should_flush(&self, wal: &Log, memtable: &BTreeMap<K, Option<V>>) -> bool{
+        // TODO check if wal is too big
+        memtable.len() >= 64
     }
 
     
 }
-// new: take in path to db, add files to vector
-
-
-// impl<K, V> LSMTree<K, V> {
-//     fn new() -> Self {
-//         LSMTree {
-//             memtable: BTreeMap::new(),
-//         }
-//     }
-// }
-
-// trait TableManager<K, V> {
-//     fn get(&self, key: K) -> Option<V>;
-//     fn put(&mut self, key: K, value: V);
-//     fn delete(&mut self, key: K);
-// }
