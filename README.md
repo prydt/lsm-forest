@@ -26,17 +26,17 @@ tests:
 
 benchmarks:
 - [x] fill_seq
-- [ ] fill_rand
+- [x] fill_rand
 
-- [ ] delete_seq
-- [ ] delete_rand
+- [x] delete_seq
+- [x] delete_rand
 
 - [x] read_seq
-- [ ] read_rand
+- [x] read_rand
 
-- [ ] overwrite (rand)
-- [ ] read_missing (rand)
-- [ ] read_hot (rand from 1% of DB)
+- [x] read_missing (rand)
+- [x] read_hot (rand from 1% of DB)
+- [x] overwrite (rand)
 - [ ] compact
 
 
