@@ -20,6 +20,7 @@ use std::{
 
 use rand::prelude::*;
 use std::os::unix::fs::MetadataExt;
+use std::sync::Arc;
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
 
@@ -87,10 +88,7 @@ mod tests {
         let mut names = Vec::new();
         for i in 0..TEST_N {
             sleep(Duration::from_millis(1));
-            let name = format!(
-                "sstable_{:08}.sst",
-                i
-            );
+            let name = format!("sstable_{:08}.sst", i);
             names.push(p.join(name.clone()).to_path_buf());
             File::create(p.join(name)).unwrap();
         }
@@ -341,14 +339,14 @@ mod tests {
             lsm.put(key, value).expect("put failed");
         }
 
-        assert_ne!(lsm.memtable.len(), 0);
+        assert_ne!(lsm.memtable.read().unwrap().len(), 0);
         lsm.put(63, 63).expect("put failed");
-        assert_eq!(lsm.memtable.len(), 0);
-        assert_eq!(lsm.wal.file.metadata().unwrap().len(), 0);
-        assert!(lsm.table_manager.sstables[0].exists());
+        assert_eq!(lsm.memtable.read().unwrap().len(), 0);
+        assert_eq!(lsm.wal.lock().unwrap().file.metadata().unwrap().len(), 0);
+        assert!(lsm.table_manager.lock().unwrap().sstables[0].exists());
 
         for i in 0..64 {
-            assert_eq!(lsm.table_manager.read(&i), Some(i));
+            assert_eq!(lsm.table_manager.lock().unwrap().read(&i), Some(i));
             assert_eq!(lsm.get(&i), Some(i));
         }
 
@@ -358,15 +356,15 @@ mod tests {
             lsm.put(key, value).expect("put failed");
         }
 
-        assert_ne!(lsm.memtable.len(), 0);
+        assert_ne!(lsm.memtable.read().unwrap().len(), 0);
         lsm.put(127, 127).expect("put failed");
-        assert_eq!(lsm.memtable.len(), 0);
-        assert_eq!(lsm.wal.file.metadata().unwrap().len(), 0);
-        assert!(lsm.table_manager.sstables[1].exists());
-        assert!(lsm.table_manager.sstables[0].exists());
+        assert_eq!(lsm.memtable.read().unwrap().len(), 0);
+        assert_eq!(lsm.wal.lock().unwrap().file.metadata().unwrap().len(), 0);
+        assert!(lsm.table_manager.lock().unwrap().sstables[1].exists());
+        assert!(lsm.table_manager.lock().unwrap().sstables[0].exists());
 
         for i in 0..128 {
-            assert_eq!(lsm.table_manager.read(&i), Some(i));
+            assert_eq!(lsm.table_manager.lock().unwrap().read(&i), Some(i));
             assert_eq!(lsm.get(&i), Some(i));
         }
     }
@@ -390,7 +388,37 @@ mod tests {
 
         for i in 0..63 {
             assert_eq!(lsm2.get(&i), Some(i));
-            assert_eq!(lsm.memtable.get(&i), lsm2.memtable.get(&i));
+            assert_eq!(
+                lsm.memtable.read().unwrap().get(&i),
+                lsm2.memtable.read().unwrap().get(&i)
+            );
+        }
+    }
+
+    #[test]
+    fn test_lsm_threads() {
+        let p = Path::new("test/test_lsm_threads");
+
+        fs::remove_dir_all(p);
+        fs::create_dir(p);
+
+        let mut temp_box = Box::new(SimpleTableManager::new(p));
+        let mut tm = Box::leak(temp_box);
+        let mut lsm = Arc::new(LSMTree::new(p.to_path_buf(), tm));
+        let mut threads = Vec::new();
+
+        for i in 1..=32 {
+            let mut my_lsm: Arc<LSMTree<i64, i64>> = Arc::clone(&lsm);
+            threads.push(std::thread::spawn( move || {
+                for j in 1..=3 {
+                    my_lsm.put(i*j, i*j).expect("put failed");
+                    assert_eq!(my_lsm.get(&(i*j)).expect("get failed"), i*j);
+                }
+            }));
+        }
+
+        for j in threads {
+            j.join().unwrap();
         }
     }
 }
