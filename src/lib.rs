@@ -35,7 +35,7 @@ mod tests {
     #[test]
     fn test_log_new() {
         let p = Path::new("test/test_log_new.log");
-        let log = Log::new(p);
+        let _log = Log::new(p);
 
         assert!(p.exists());
         // fs::remove_file(p).unwrap();
@@ -67,14 +67,14 @@ mod tests {
 
             entry.set_crc();
 
-            log.append(entry);
+            let _ = log.append(entry);
         }
 
         let mut other_log = Log::new(p);
         let recovered_memtable: BTreeMap<String, Option<String>> = other_log.recovery().unwrap();
 
         for (k, v) in memtable.iter() {
-            //assert_eq!(v, &recovered_memtable.get(k).as_mut().unwrap().as_mut().unwrap());
+            assert_eq!(v, recovered_memtable.get(k).unwrap());
         }
     }
 
@@ -82,8 +82,8 @@ mod tests {
     fn test_simple_tm_new() {
         let p = Path::new("test/test_simple_tm_new");
 
-        fs::remove_dir_all(p);
-        fs::create_dir(p);
+        let _ = fs::remove_dir_all(p);
+        let _ = fs::create_dir(p);
 
         let mut names = Vec::new();
         for i in 0..TEST_N {
@@ -101,16 +101,14 @@ mod tests {
         }
         // assert_eq!(tm.sstables, names);
         // fs::remove_dir_all(p).unwrap();
-
-        fs::remove_dir_all(p).unwrap();
     }
 
     #[test]
     fn test_simple_tm_add_table() {
         let p = Path::new("test/test_simple_tm_add_table");
 
-        fs::remove_dir_all(p);
-        fs::create_dir(p);
+        let _ = fs::remove_dir_all(p);
+        let _ = fs::create_dir(p);
 
         let mut tm = SimpleTableManager::<String, String>::new(p);
         let mut memtable = BTreeMap::new();
@@ -142,13 +140,13 @@ mod tests {
     fn test_simple_tm_should_flush() {
         let p = Path::new("test/test_simple_tm_should_flush");
 
-        fs::remove_dir_all(p);
-        fs::create_dir(p);
+        let _ = fs::remove_dir_all(p);
+        let _ = fs::create_dir(p);
 
-        let mut tm = SimpleTableManager::<String, String>::new(p);
+        let tm = SimpleTableManager::<String, String>::new(p);
         let mut memtable = BTreeMap::new();
 
-        let mut dummy_wal = Log::new(&p.join("temp"));
+        let dummy_wal = Log::new(&p.join("temp"));
 
         assert_eq!(tm.should_flush(&dummy_wal, &memtable), false);
 
@@ -176,8 +174,8 @@ mod tests {
     fn test_tm_read() {
         let p = Path::new("test/test_tm_read");
 
-        fs::remove_dir_all(p);
-        fs::create_dir(p);
+        let _ = fs::remove_dir_all(p);
+        let _ = fs::create_dir(p);
 
         let mut tm = SimpleTableManager::<String, String>::new(p);
         let mut memtable = BTreeMap::new();
@@ -218,11 +216,11 @@ mod tests {
     fn test_lsm_put_get() {
         let p = Path::new("test/test_lsm_put_get");
 
-        fs::remove_dir_all(p);
-        fs::create_dir(p);
+        let _ = fs::remove_dir_all(p);
+        let _ = fs::create_dir(p);
 
         let mut tm = SimpleTableManager::<String, String>::new(p);
-        let mut lsm = LSMTree::<String, String>::new(p.to_path_buf(), &mut tm);
+        let lsm = LSMTree::<String, String>::new(p.to_path_buf(), &mut tm);
         let mut memtable = BTreeMap::new();
 
         for i in 0..TEST_N {
@@ -242,11 +240,11 @@ mod tests {
     fn test_lsm_put_get_random() {
         let p = Path::new("test/test_lsm_put_get_random");
 
-        fs::remove_dir_all(p);
-        fs::create_dir(p);
+        let _ = fs::remove_dir_all(p);
+        let _ = fs::create_dir(p);
 
         let mut tm = SimpleTableManager::new(p);
-        let mut lsm = LSMTree::new(p.to_path_buf(), &mut tm);
+        let lsm = LSMTree::new(p.to_path_buf(), &mut tm);
         let mut memtable = BTreeMap::new();
         let mut rng = rand::thread_rng();
 
@@ -268,11 +266,11 @@ mod tests {
     fn test_lsm_remove() {
         let p = Path::new("test/test_lsm_remove");
 
-        fs::remove_dir_all(p);
-        fs::create_dir(p);
+        let _ = fs::remove_dir_all(p);
+        let _ = fs::create_dir(p);
 
         let mut tm = SimpleTableManager::new(p);
-        let mut lsm = LSMTree::new(p.to_path_buf(), &mut tm);
+        let lsm = LSMTree::new(p.to_path_buf(), &mut tm);
 
         for i in 0..TEST_N {
             let key = i;
@@ -290,11 +288,11 @@ mod tests {
     fn test_lsm_remove_random() {
         let p = Path::new("test/test_lsm_remove_random");
 
-        fs::remove_dir_all(p);
-        fs::create_dir(p);
+        let _ = fs::remove_dir_all(p);
+        let _ = fs::create_dir(p);
 
         let mut tm = SimpleTableManager::new(p);
-        let mut lsm = LSMTree::new(p.to_path_buf(), &mut tm);
+        let lsm = LSMTree::new(p.to_path_buf(), &mut tm);
 
         let mut rng = rand::thread_rng();
 
@@ -322,11 +320,11 @@ mod tests {
     fn test_lsm_flush() {
         let p = Path::new("test/test_lsm_flush");
 
-        fs::remove_dir_all(p);
-        fs::create_dir(p);
+        let _ = fs::remove_dir_all(p);
+        let _ = fs::create_dir(p);
 
         let mut tm = SimpleTableManager::new(p);
-        let mut lsm = LSMTree::new(p.to_path_buf(), &mut tm);
+        let lsm = LSMTree::new(p.to_path_buf(), &mut tm);
 
         // add 64 entries to memtable
         // check if memtbale is cleared
@@ -373,18 +371,18 @@ mod tests {
     fn test_lsm_recovery() {
         let p = Path::new("test/test_lsm_recovery");
 
-        fs::remove_dir_all(p);
-        fs::create_dir(p);
+        let _ = fs::remove_dir_all(p);
+        let _ = fs::create_dir(p);
 
         let mut tm = SimpleTableManager::new(p);
-        let mut lsm = LSMTree::new(p.to_path_buf(), &mut tm);
+        let lsm = LSMTree::new(p.to_path_buf(), &mut tm);
 
         for i in 0..63 {
             lsm.put(i, i).expect("put failed");
         }
 
         let mut tm2 = SimpleTableManager::new(p);
-        let mut lsm2 = LSMTree::new(p.to_path_buf(), &mut tm2);
+        let lsm2 = LSMTree::new(p.to_path_buf(), &mut tm2);
 
         for i in 0..63 {
             assert_eq!(lsm2.get(&i), Some(i));
@@ -399,20 +397,23 @@ mod tests {
     fn test_lsm_threads() {
         let p = Path::new("test/test_lsm_threads");
 
-        fs::remove_dir_all(p);
-        fs::create_dir(p);
+        let _ = fs::remove_dir_all(p);
+        let _ = fs::create_dir(p);
 
-        let mut temp_box = Box::new(SimpleTableManager::new(p));
-        let mut tm = Box::leak(temp_box);
-        let mut lsm = Arc::new(LSMTree::new(p.to_path_buf(), tm));
+        let temp_box = Box::new(SimpleTableManager::new(p));
+        let tm = Box::leak(temp_box);
+        let lsm = Arc::new(LSMTree::new(p.to_path_buf(), tm));
         let mut threads = Vec::new();
 
-        for i in 1..=32 {
-            let mut my_lsm: Arc<LSMTree<i64, i64>> = Arc::clone(&lsm);
+        for i in 1..=512 {
+            let my_lsm: Arc<LSMTree<i64, i64>> = Arc::clone(&lsm);
             threads.push(std::thread::spawn( move || {
-                for j in 1..=3 {
-                    my_lsm.put(i*j, i*j).expect("put failed");
-                    assert_eq!(my_lsm.get(&(i*j)).expect("get failed"), i*j);
+                for j in 0..64 {
+                    let (key, value) = (i*1048 +j, i*1048 +j);
+                    my_lsm.put(key, value).expect("put failed");
+                    assert_eq!(my_lsm.get(&key).expect("get failed"), value);
+                    my_lsm.remove(&key).expect("remove failed");
+                    assert_eq!(my_lsm.get(&key), None);
                 }
             }));
         }

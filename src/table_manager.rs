@@ -107,6 +107,7 @@ impl<K: LogSerial, V: LogSerial> TableManager<K, V> for SimpleTableManager<K, V>
 
     fn should_flush(&self, wal: &Log, memtable: &BTreeMap<K, Option<V>>) -> bool {
         // TODO check if wal is too big
-        memtable.len() >= 64
+
+        memtable.len() >= 64 // || wal.file.metadata().unwrap().len() >= (512 * 1024) S
     }
 }

@@ -1,5 +1,5 @@
 # lsm-forest
-- [ ] synchronization
+- [x] synchronization
     - ~~create lock per ss_table (make sure threads read files in order)~~
     - ~~for compaction: thread per file, each reads file and contructs btree, return btree and have one thread merge in correct order and write~~
     - rwlock for memtable
@@ -15,6 +15,7 @@
 - [x] lsm tree recovery
 - [ ] read cache in table_manager
 - [ ] add multithreading to sstable read
+- [ ] fix should_flush, account for wal length
 
 
 

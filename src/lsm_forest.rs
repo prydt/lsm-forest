@@ -5,7 +5,7 @@ use core::fmt::Debug;
 use crc32fast;
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::{Mutex, RwLock};
+use std::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{
     collections::BTreeMap,
     fs::{self, File},
@@ -67,24 +67,29 @@ impl<'a, K: LogSerial, V: LogSerial, TM: TableManager<K, V>> LSMTree<'a, K, V, T
             value: value.clone(),
         };
         log_entry.set_crc();
-        {
-            self.wal.lock().unwrap().append(log_entry)?;
-        }
 
         {
+            let mut wal_lock = self.wal.lock().unwrap();
+            wal_lock.append(log_entry)?;
+
             self.memtable
                 .write()
                 .unwrap()
                 .insert(key.clone(), value.clone());
         }
 
-        if self
-            .table_manager
-            .lock()
-            .unwrap()
-            .should_flush(&self.wal.lock().unwrap(), &self.memtable.read().unwrap())
         {
-            self.flush_memtable()?;
+            let mut wal_lock = self.wal.lock().unwrap();
+            let mut memtable_lock = self.memtable.write().unwrap();
+            let mut tm_lock = self.table_manager.lock().unwrap();
+
+            if tm_lock.should_flush(&wal_lock, &&memtable_lock) {
+                self.flush_memtable_helper(wal_lock, memtable_lock, tm_lock)?;
+                // drop(wal_lock);
+                // println!("start flushing");
+                // self.flush_memtable()?;
+                // println!("stop flushing");
+            }
         }
 
         Ok(())
@@ -99,26 +104,31 @@ impl<'a, K: LogSerial, V: LogSerial, TM: TableManager<K, V>> LSMTree<'a, K, V, T
         self.put_helper(key.clone(), None)
     }
 
-    // TODO TEST??
-    pub fn flush_memtable(&self) -> Result<()> {
-        // flush memtable to disk
-        {
-            self.table_manager
-                .lock()
-                .unwrap()
-                .add_table(self.memtable.read().unwrap().clone())?;
-        }
+    fn flush_memtable_helper(
+        &self,
+        mut wal_lock: MutexGuard<Log>,
+        mut memtable_lock: RwLockWriteGuard<BTreeMap<K, Option<V>>>,
+        mut tm_lock: MutexGuard<&mut TM>,
+    ) -> Result<()> {
+        // todo!()
 
-        {
-            self.memtable.write().unwrap().clear();
-        }
+        tm_lock.add_table(memtable_lock.clone())?;
 
-        assert!(self.memtable.read().unwrap().is_empty());
-        // self.wal = Log::new(&self.path.join("wal.log"));
-        {
-            self.wal.lock().unwrap().clear()?;
-        }
-        assert!(self.wal.lock().unwrap().file.metadata()?.len() == 0);
+        memtable_lock.clear();
+
+        assert!(memtable_lock.is_empty());
+
+        wal_lock.clear()?;
+        assert!(wal_lock.file.metadata()?.len() == 0);
+
         Ok(())
+    }
+
+    pub fn flush_memtable(&self) -> Result<()> {
+        let mut wal_lock = self.wal.lock().unwrap();
+        let mut memtable_lock = self.memtable.write().unwrap();
+        let mut tm_lock = self.table_manager.lock().unwrap();
+
+        self.flush_memtable_helper(wal_lock, memtable_lock, tm_lock)
     }
 }

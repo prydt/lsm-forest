@@ -73,7 +73,6 @@ impl Log {
 
         let mut memtable = BTreeMap::new();
 
-        println!("start recovery\n");
         while let Ok(entry) = bincode::decode_from_reader::<
             LogEntry<K, Option<V>>,
             &mut BufReader<&File>,
