@@ -1,4 +1,4 @@
-use crate::{log::*, table_manager::SimpleTableManager, table_manager::TableManager};
+use crate::{log::*, table_manager::TableManager};
 use anyhow::Result;
 use bincode::{Decode, Encode};
 use core::fmt::Debug;
@@ -13,6 +13,8 @@ use std::{
     io::BufReader,
     path::Path,
 };
+
+use crate::table_manager::simple_table_manager::SimpleTableManager;
 
 pub trait LogSerial = Encode + Decode + Hash + Ord + 'static + Debug + Clone;
 

@@ -8,12 +8,7 @@ use std::io::Write;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
-pub trait TableManager<K: LogSerial, V: LogSerial> {
-    fn new(p: &Path) -> Self;
-    fn add_table(&mut self, memtable: BTreeMap<K, Option<V>>) -> Result<()>;
-    fn read(&self, key: &K) -> Option<V>;
-    fn should_flush(&self, wal: &Log, memtable: &BTreeMap<K, Option<V>>) -> bool;
-}
+use crate::table_manager::TableManager;
 
 pub struct SimpleTableManager<K: LogSerial, V: LogSerial> {
     // store sstable names with unix timestamp in an array

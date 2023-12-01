@@ -24,6 +24,9 @@ use std::sync::Arc;
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
 
+
+use crate::table_manager::simple_table_manager::*;
+
 trait LogSerial = Encode + Decode + Hash + Ord + 'static;
 const TEST_N: i64 = 4096;
 
