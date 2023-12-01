@@ -1,4 +1,5 @@
 #![feature(trait_alias)]
+#![allow(unused_imports)]
 mod log;
 mod lsm_forest;
 mod table_manager;
@@ -186,7 +187,7 @@ mod tests {
         let mut tm = SimpleTableManager::<String, String>::new(p);
         let mut memtable = BTreeMap::new();
 
-        for i in 0..100 {
+        for i in 0..256 {
             let key = format!("key{}", i);
             let value = format!("value{}", i);
             let value_opt = Some(value.clone());
@@ -195,7 +196,7 @@ mod tests {
 
         let mut copy_memtable = memtable.clone();
 
-        for i in 0..100 {
+        for i in 0..256 {
             let key = format!("key{}", i);
             let mut value = copy_memtable.get(&key).unwrap().as_ref().unwrap().clone();
             value = format!("{}actual", value);
@@ -206,7 +207,7 @@ mod tests {
             copy_memtable.remove(&key);
         }
 
-        for i in 0..100 {
+        for i in 0..256 {
             let key = format!("key{}", i);
             assert_eq!(
                 tm.read(&key),
@@ -221,7 +222,7 @@ mod tests {
     }
 
     #[test]
-    fn test_lsm_tree_put_get() {
+    fn test_lsm_put_get() {
         let p = Path::new("test/test_lsm_put_get");
 
         fs::remove_dir_all(p);
@@ -232,7 +233,7 @@ mod tests {
             LSMTree::<String, String>::new(p.to_path_buf(), &mut tm);
         let mut memtable = BTreeMap::new();
 
-        for i in 0..128 {
+        for i in 0..TEST_N {
             let key = format!("key{}", i);
             let value = format!("value{}", i);
             memtable.insert(key.clone(), value.clone());
