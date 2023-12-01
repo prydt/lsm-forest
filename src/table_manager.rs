@@ -5,7 +5,6 @@ use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::fs::{self, File};
 use std::collections::BTreeMap;
-use std::time::SystemTime;
 use std::io::Write;
 use crate::lsm_forest::LogSerial;
 
@@ -60,7 +59,7 @@ impl<K: LogSerial, V: LogSerial> TableManager<K,V> for  SimpleTableManager<K, V>
 
     fn add_table(&mut self, memtable: BTreeMap<K, Option<V>>) -> Result<()> {
         
-        let name = format!("sstable_{}.sst", self.sstables.len());
+        let name = format!("sstable_{:08}.sst", self.sstables.len());
         let path = self.path.join(&name);
         self.sstables.push(path.clone());
         //let mut file = File::create(self.path.join(name))?;
@@ -88,14 +87,14 @@ impl<K: LogSerial, V: LogSerial> TableManager<K,V> for  SimpleTableManager<K, V>
     fn read(&self, key: &K) -> Option<V> {
         // let mut reversed_sstables = self.sstables.clone();
         // reversed_sstables.rev();
-        println!("searching for key {:?}", key);
-        println!("sstables: {:?}", self.sstables);
+        // println!("searching for key {:?}", key);
+        // println!("sstables: {:?}", self.sstables);
         for path in self.sstables.iter().rev() {
             let f = File::open(path).unwrap();
-            println!("read from {:?}", path);
+            // println!("read from {:?}", path);
             let mut reader = std::io::BufReader::new(&f);
             while let Ok(entry) = bincode::decode_from_reader::<SimpleTableEntry<K,V>, &mut std::io::BufReader<&File>, _>(&mut reader, bincode::config::standard()) {
-                println!("read entry {:?}", entry);
+                // println!("read entry {:?}", entry);
                 if entry.key == key.clone() {
                     return entry.value;
                 }
