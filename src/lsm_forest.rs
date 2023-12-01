@@ -44,8 +44,14 @@ impl<'a, K: LogSerial, V: LogSerial, TM: TableManager<K, V>> LSMTree<'a, K, V, T
     pub fn get(&self, key: &K) -> Option<V> {
         // look at memtable
         match self.memtable.get(&key) {
-            Some(value) => value.clone(),
-            None => self.table_manager.read(&key),
+            Some(value) => {
+                println!("memtable hit {:?}: {:?}", key, value.clone().unwrap());
+                value.clone()
+            }
+            None => {
+                println!("memtable miss {:?}", key);
+                self.table_manager.read(&key)
+            }
         }
     }
 
@@ -71,8 +77,7 @@ impl<'a, K: LogSerial, V: LogSerial, TM: TableManager<K, V>> LSMTree<'a, K, V, T
         self.put_helper(key, Some(value))
     }
 
-
-    pub fn remove(&mut self, key: &K) -> Result<()>{
+    pub fn remove(&mut self, key: &K) -> Result<()> {
         // self.put(key.clone(), None)
         self.put_helper(key.clone(), None)
     }
@@ -82,6 +87,7 @@ impl<'a, K: LogSerial, V: LogSerial, TM: TableManager<K, V>> LSMTree<'a, K, V, T
         // flush memtable to disk
         self.table_manager.add_table(self.memtable.clone())?;
         self.memtable.clear();
+        assert!(self.memtable.is_empty());
         self.wal = Log::new(&self.path.join("wal.log"));
         Ok(())
     }

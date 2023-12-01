@@ -292,6 +292,60 @@ mod tests {
         //     assert_eq!(lsm.get(&key), Some(value));
         // }
     }
+
+    #[test]
+    fn test_lsm_flush() {
+        let p = Path::new("test/test_lsm_flush");
+
+        fs::remove_dir_all(p);
+        fs::create_dir(p);
+
+        let mut tm = SimpleTableManager::new(p);
+        let mut lsm =
+            LSMTree::new(p.to_path_buf(), &mut tm);
+
+        // add 64 entries to memtable
+        // check if memtbale is cleared
+        // check if wal is cleared
+        // check if sstable is created
+
+        for i in 0..63 {
+            let key = i;
+            let value = i;
+            lsm.put(key, value).expect("put failed");
+        }
+
+        assert_ne!(lsm.memtable.len(), 0);
+        lsm.put(63, 63).expect("put failed");
+        assert_eq!(lsm.memtable.len(), 0);
+        assert_eq!(lsm.wal.file.metadata().unwrap().len(), 0);
+        assert!(lsm.table_manager.sstables[0].exists());
+
+        for i in 0..64 {
+            assert_eq!(lsm.table_manager.read(&i), Some(i));
+            assert_eq!(lsm.get(&i), Some(i));
+        }
+
+        for i in 64..127 {
+            let key = i;
+            let value = i;
+            lsm.put(key, value).expect("put failed");
+        }
+
+        assert_ne!(lsm.memtable.len(), 0);
+        lsm.put(127, 127).expect("put failed");
+        assert_eq!(lsm.memtable.len(), 0);
+        assert_eq!(lsm.wal.file.metadata().unwrap().len(), 0);
+        assert!(lsm.table_manager.sstables[1].exists());
+        assert!(lsm.table_manager.sstables[0].exists());
+
+        for i in 0..128 {
+            assert_eq!(lsm.table_manager.read(&i), Some(i));
+            assert_eq!(lsm.get(&i), Some(i));
+        }
+
+    }
+
     //      fillseq       -- write N values in sequential key order in async mode
     //      fillrandom    -- write N values in random key order in async mode
     //      overwrite     -- overwrite N values in random key order in async mode
