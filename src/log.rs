@@ -10,10 +10,12 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher},
     io::BufReader,
     path::Path,
+    path::PathBuf,
 };
 
 pub struct Log {
     pub file: File,
+    pub path: PathBuf,
 }
 
 #[derive(Encode, Decode, Debug)]
@@ -54,7 +56,7 @@ impl Log {
             .open(path)
             .unwrap();
 
-        Log { file }
+        Log { file, path: path.to_path_buf() }
     }
 
     pub fn append<K: LogSerial, V: LogSerial>(
@@ -88,8 +90,20 @@ impl Log {
     }
 
     pub fn clear(&mut self) -> Result<()> {
-        self.file.set_len(0)?;
-        self.file.flush()?;
+        // self.file.set_len(0)?;
+        // fs::remove_file(self.file.path)?;
+        // self.file.flush()?;
+        // self.file.sync_all()?;
+        fs::remove_file(&self.path)?;
+        
+        self.file = fs::OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .open(&self.path)
+            .unwrap();
+
+        assert_eq!(self.file.metadata()?.len(), 0);
         Ok(())
     }
 }

@@ -7,8 +7,8 @@
     - one giant lock for log
 - [ ] bloom filter
 - [ ] compaction
-    - simple: many files into 1
-    - advanced: second level compacts files from first level after threshold. third level compacts files from second and third level after threshold.
+    - [x] simple: many files into 1
+    - [ ] advanced: second level compacts files from first level after threshold. third level compacts files from second and third level after threshold.
 - [x] log recovery
     - add log.delete
     - ~~move log.recovery to log.new~~
@@ -25,13 +25,13 @@ tests:
 
 
 benchmarks:
-- [ ] fill_seq
+- [x] fill_seq
 - [ ] fill_rand
 
 - [ ] delete_seq
 - [ ] delete_rand
 
-- [ ] read_seq
+- [x] read_seq
 - [ ] read_rand
 
 - [ ] overwrite (rand)
