@@ -45,11 +45,11 @@ impl<'a, K: LogSerial, V: LogSerial, TM: TableManager<K, V>> LSMTree<'a, K, V, T
         // look at memtable
         match self.memtable.get(&key) {
             Some(value) => {
-                println!("memtable hit {:?}: {:?}", key, value.clone().unwrap());
+                // println!("memtable hit {:?}: {:?}", key, value.clone().unwrap());
                 value.clone()
             }
             None => {
-                println!("memtable miss {:?}", key);
+                // println!("memtable miss {:?}", key);
                 self.table_manager.read(&key)
             }
         }
