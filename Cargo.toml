@@ -9,6 +9,7 @@ edition = "2021"
 anyhow = "1.0.75"
 bincode = "2.0.0-rc.1"
 crc32fast = "1.3.2"
+rand = "0.8.5"
 
 [lib]
 doctest = false

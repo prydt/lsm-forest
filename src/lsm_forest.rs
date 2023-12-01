@@ -49,16 +49,16 @@ impl<'a, K: LogSerial, V: LogSerial, TM: TableManager<K, V>> LSMTree<'a, K, V, T
         }
     }
 
-    pub fn put(&mut self, key: K, value: V) -> Result<()> {
+    fn put_helper(&mut self, key: K, value: Option<V>) -> Result<()> {
         // add to memtable
         let mut log_entry = LogEntry {
             crc: 0,
             key: key.clone(),
-            value: Some(value.clone()),
+            value: value.clone(),
         };
         log_entry.set_crc();
         self.wal.append(log_entry)?;
-        self.memtable.insert(key, Some(value));
+        self.memtable.insert(key, value);
 
         if self.table_manager.should_flush(&self.wal, &self.memtable) {
             self.flush_memtable()?;
@@ -67,8 +67,14 @@ impl<'a, K: LogSerial, V: LogSerial, TM: TableManager<K, V>> LSMTree<'a, K, V, T
         Ok(())
     }
 
-    pub fn remove(&mut self, key: K) {
-        todo!()
+    pub fn put(&mut self, key: K, value: V) -> Result<()> {
+        self.put_helper(key, Some(value))
+    }
+
+
+    pub fn remove(&mut self, key: &K) -> Result<()>{
+        // self.put(key.clone(), None)
+        self.put_helper(key.clone(), None)
     }
 
     // TODO TEST??

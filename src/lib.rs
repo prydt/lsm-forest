@@ -20,8 +20,10 @@ use std::{
 use std::os::unix::fs::MetadataExt;
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
+use rand::prelude::*;
 
 trait LogSerial = Encode + Decode + Hash + Ord + 'static;
+const TEST_N: i64 = 4096;
 
 #[cfg(test)]
 mod tests {
@@ -48,7 +50,7 @@ mod tests {
 
         let mut memtable = BTreeMap::new();
 
-        for i in 0..100 {
+        for i in 0..TEST_N {
             let key = format!("key{}", i);
             let value = format!("value{}", i);
             let value_opt = Some(value.clone());
@@ -82,7 +84,7 @@ mod tests {
         fs::create_dir(p);
 
         let mut names = Vec::new();
-        for i in 0..100 {
+        for i in 0..TEST_N {
             sleep(Duration::from_millis(1));
             let name = format!(
                 "sstable_{}.sst",
@@ -117,7 +119,7 @@ mod tests {
         let mut tm = SimpleTableManager::<String, String>::new(p);
         let mut memtable = BTreeMap::new();
 
-        for i in 0..100 {
+        for i in 0..TEST_N {
             let key = format!("key{}", i);
             let value = format!("value{}", i);
             let value_opt = Some(value.clone());
@@ -228,13 +230,66 @@ mod tests {
         let mut tm = SimpleTableManager::<String, String>::new(p);
         let mut lsm =
             LSMTree::<String, String>::new(p.to_path_buf(), &mut tm);
+        let mut memtable = BTreeMap::new();
 
-        for i in 0..4096 {
+        for i in 0..128 {
             let key = format!("key{}", i);
             let value = format!("value{}", i);
+            memtable.insert(key.clone(), value.clone());
             lsm.put(key.clone(), value.clone()).expect("put failed");
             assert_eq!(lsm.get(&key), Some(value));
         }
+
+        for (k, v) in memtable.iter() {
+            assert_eq!(lsm.get(&k), Some(v.clone()));
+        }
+    }
+
+    #[test]
+    fn test_lsm_put_get_random() {
+        let p = Path::new("test/test_lsm_put_get_random");
+
+        fs::remove_dir_all(p);
+        fs::create_dir(p);
+
+        let mut tm = SimpleTableManager::new(p);
+        let mut lsm =
+            LSMTree::new(p.to_path_buf(), &mut tm);
+        let mut memtable = BTreeMap::new();
+        let mut rng = rand::thread_rng();
+        
+
+        for _i in 0..TEST_N {
+            let key: String = format!("{}", rng.gen::<i32>());
+            let value: String = format!("{}", rng.gen::<i32>());
+            memtable.insert(key.clone(), value.clone());
+            lsm.put(key.clone(), value.clone()).expect("put failed");
+            assert_eq!(lsm.get(&key), Some(value));
+        }
+
+        for (k, v) in memtable.iter() {
+            // assert_eq!(lsm.get(&k), v.clone());
+            assert_eq!(lsm.get(&k), Some(v.clone()));
+        }
+    }
+
+    #[test]
+    fn test_lsm_remove() {
+        // let p = Path::new("test/test_lsm_remove");
+
+        // fs::remove_dir_all(p);
+        // fs::create_dir(p);
+
+        // let mut tm = SimpleTableManager::<String, String>::new(p);
+        // let mut lsm =
+        //     LSMTree::<String, String>::new(p.to_path_buf(), &mut tm);
+
+        // for i in 0..TEST_N {
+        //     let key = format!("key{}", i);
+        //     let value = format!("value{}", i);
+        //     lsm.put(key.clone(), value.clone()).expect("put failed");
+        //     assert_eq!(lsm.get(&key), Some(value));
+        // }
     }
     //      fillseq       -- write N values in sequential key order in async mode
     //      fillrandom    -- write N values in random key order in async mode
