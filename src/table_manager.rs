@@ -1,12 +1,12 @@
+use crate::lsm_forest::LogSerial;
 use crate::{log::*, lsm_forest::LSMTree};
 use anyhow::Result;
-use bincode::{Encode, Decode};
+use bincode::{Decode, Encode};
+use std::collections::BTreeMap;
+use std::fs::{self, File};
+use std::io::Write;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
-use std::fs::{self, File};
-use std::collections::BTreeMap;
-use std::io::Write;
-use crate::lsm_forest::LogSerial;
 
 pub trait TableManager<K: LogSerial, V: LogSerial> {
     fn new(p: &Path) -> Self;
@@ -29,11 +29,10 @@ pub struct SimpleTableEntry<K: LogSerial, V: LogSerial> {
     pub value: Option<V>,
 }
 
-
-impl<K: LogSerial, V: LogSerial> TableManager<K,V> for  SimpleTableManager<K, V> {
-    fn new (p: &Path) -> Self {
+impl<K: LogSerial, V: LogSerial> TableManager<K, V> for SimpleTableManager<K, V> {
+    fn new(p: &Path) -> Self {
         let mut sstables = Vec::new();
-        
+
         for file in fs::read_dir(p).unwrap() {
             let file = file.unwrap();
             let path = file.path();
@@ -43,8 +42,8 @@ impl<K: LogSerial, V: LogSerial> TableManager<K,V> for  SimpleTableManager<K, V>
                     if ext == "sst" {
                         sstables.push(path);
                     }
-                },
-                None => {},
+                }
+                None => {}
             }
         }
 
@@ -58,7 +57,6 @@ impl<K: LogSerial, V: LogSerial> TableManager<K,V> for  SimpleTableManager<K, V>
     }
 
     fn add_table(&mut self, memtable: BTreeMap<K, Option<V>>) -> Result<()> {
-        
         let name = format!("sstable_{:08}.sst", self.sstables.len());
         let path = self.path.join(&name);
         self.sstables.push(path.clone());
@@ -73,12 +71,9 @@ impl<K: LogSerial, V: LogSerial> TableManager<K,V> for  SimpleTableManager<K, V>
         // self.file.write(&payload)?;
         // // self.file.flush()?;
         for (key, value) in memtable {
-            let entry = SimpleTableEntry {
-                key,
-                value,
-            };
+            let entry = SimpleTableEntry { key, value };
             let payload = bincode::encode_to_vec(&entry, bincode::config::standard())?;
-            file.write(&payload)?;   
+            file.write(&payload)?;
         }
         file.flush()?;
         Ok(())
@@ -93,20 +88,25 @@ impl<K: LogSerial, V: LogSerial> TableManager<K,V> for  SimpleTableManager<K, V>
             let f = File::open(path).unwrap();
             // println!("read from {:?}", path);
             let mut reader = std::io::BufReader::new(&f);
-            while let Ok(entry) = bincode::decode_from_reader::<SimpleTableEntry<K,V>, &mut std::io::BufReader<&File>, _>(&mut reader, bincode::config::standard()) {
+            while let Ok(entry) = bincode::decode_from_reader::<
+                SimpleTableEntry<K, V>,
+                &mut std::io::BufReader<&File>,
+                _,
+            >(&mut reader, bincode::config::standard())
+            {
                 // println!("read entry {:?}", entry);
                 if entry.key == key.clone() {
                     return entry.value;
+                } else if entry.key > key.clone() {
+                    break;
                 }
             }
         }
         None
     }
 
-    fn should_flush(&self, wal: &Log, memtable: &BTreeMap<K, Option<V>>) -> bool{
+    fn should_flush(&self, wal: &Log, memtable: &BTreeMap<K, Option<V>>) -> bool {
         // TODO check if wal is too big
         memtable.len() >= 64
     }
-
-    
 }
