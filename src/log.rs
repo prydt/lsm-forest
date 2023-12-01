@@ -49,7 +49,6 @@ impl Log {
     pub fn new(path: &Path) -> Log {
         let file = fs::OpenOptions::new()
             .create(true)
-            .truncate(true)
             .read(true)
             .write(true)
             .open(path)
@@ -87,5 +86,11 @@ impl Log {
         }
 
         Ok(memtable)
+    }
+
+    pub fn clear(&mut self) -> Result<()> {
+        self.file.set_len(0)?;
+        self.file.flush()?;
+        Ok(())
     }
 }

@@ -31,11 +31,13 @@ pub struct LSMTree<
 impl<'a, K: LogSerial, V: LogSerial, TM: TableManager<K, V>> LSMTree<'a, K, V, TM> {
     /// Create a new LSM Tree
     pub fn new(p: PathBuf, tm: &'a mut TM) -> LSMTree<'a, K, V, TM> {
-        // TODO add recovery
+        let mut log = Log::new(&p.join("wal.log"));
+        let memtable = log.recovery().unwrap_or(BTreeMap::new());
+
         LSMTree {
             path: p.clone(),
-            wal: Log::new(&p.join("wal.log")),
-            memtable: BTreeMap::new(),
+            wal: log,
+            memtable: memtable,
             table_manager: tm,
         }
     }
@@ -88,7 +90,9 @@ impl<'a, K: LogSerial, V: LogSerial, TM: TableManager<K, V>> LSMTree<'a, K, V, T
         self.table_manager.add_table(self.memtable.clone())?;
         self.memtable.clear();
         assert!(self.memtable.is_empty());
-        self.wal = Log::new(&self.path.join("wal.log"));
+        // self.wal = Log::new(&self.path.join("wal.log"));
+        self.wal.clear()?;
+        assert!(self.wal.file.metadata()?.len() == 0);
         Ok(())
     }
 }

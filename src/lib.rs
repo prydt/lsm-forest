@@ -88,11 +88,8 @@ mod tests {
         for i in 0..TEST_N {
             sleep(Duration::from_millis(1));
             let name = format!(
-                "sstable_{}.sst",
-                SystemTime::now()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis()
+                "sstable_{:08}.sst",
+                i
             );
             names.push(p.join(name.clone()).to_path_buf());
             File::create(p.join(name)).unwrap();
@@ -371,6 +368,29 @@ mod tests {
         for i in 0..128 {
             assert_eq!(lsm.table_manager.read(&i), Some(i));
             assert_eq!(lsm.get(&i), Some(i));
+        }
+    }
+
+    #[test]
+    fn test_lsm_recovery() {
+        let p = Path::new("test/test_lsm_recovery");
+
+        fs::remove_dir_all(p);
+        fs::create_dir(p);
+
+        let mut tm = SimpleTableManager::new(p);
+        let mut lsm = LSMTree::new(p.to_path_buf(), &mut tm);
+
+        for i in 0..63 {
+            lsm.put(i, i).expect("put failed");
+        }
+
+        let mut tm2 = SimpleTableManager::new(p);
+        let mut lsm2 = LSMTree::new(p.to_path_buf(), &mut tm2);
+
+        for i in 0..63 {
+            assert_eq!(lsm2.get(&i), Some(i));
+            assert_eq!(lsm.memtable.get(&i), lsm2.memtable.get(&i));
         }
     }
 }

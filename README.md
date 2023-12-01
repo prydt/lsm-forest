@@ -9,10 +9,10 @@
 - [ ] compaction
     - simple: many files into 1
     - advanced: second level compacts files from first level after threshold. third level compacts files from second and third level after threshold.
-- [ ] log recovery
+- [x] log recovery
     - add log.delete
-    - move log.recovery to log.new
-- [ ] lsm tree recovery
+    - ~~move log.recovery to log.new~~
+- [x] lsm tree recovery
 - [ ] read cache in table_manager
 - [ ] add multithreading to sstable read
 
