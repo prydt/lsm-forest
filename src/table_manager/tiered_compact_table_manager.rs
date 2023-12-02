@@ -60,7 +60,8 @@ impl<K: LogSerial, V: LogSerial> TableManager<K, V> for TieredCompactTableManage
     }
 
     fn read(&mut self, key: &K) -> Option<V> {
-        self.search_files(self.tm.sstables.clone(), key)
+        let result = self
+            .search_files(self.tm.sstables.clone(), key)
             .or(self.search_files(self.level2.clone(), key))
             .or({
                 if let Some(ref level3_path) = self.level3 {
@@ -68,8 +69,12 @@ impl<K: LogSerial, V: LogSerial> TableManager<K, V> for TieredCompactTableManage
                 } else {
                     None
                 }
-            })
-            .unwrap()
+            });
+
+        match result {
+            Some(value) => value,
+            None => None,
+        }
     }
 
     fn should_flush(&self, wal: &Log, memtable: &BTreeMap<K, Option<V>>) -> bool {

@@ -916,7 +916,7 @@ mod tests {
         time_wtr.flush().expect("CSV flush failed");
     }
 
-    // #[test]
+    #[test]
     fn run_multithread_benchmark() {
         let mut time_wtr = csv::Writer::from_path("test/benchmark_multithread_time.csv").unwrap();
 
