@@ -157,7 +157,7 @@ mod tests {
 
         assert_eq!(tm.should_flush(&dummy_wal, &memtable), false);
 
-        for i in 0..63 {
+        for i in 0..255 {
             let key = format!("key{}", i);
             let value = format!("value{}", i);
             let value_opt = Some(value.clone());
@@ -167,7 +167,7 @@ mod tests {
             assert_eq!(tm.should_flush(&dummy_wal, &memtable), false);
         }
 
-        for i in 64..200 {
+        for i in 256..400 {
             let key = format!("key{}", i);
             let value = format!("value{}", i);
             let value_opt = Some(value.clone());
@@ -187,7 +187,7 @@ mod tests {
         let mut tm = SimpleTableManager::<String, String>::new(p);
         let mut memtable = BTreeMap::new();
 
-        for i in 0..256 {
+        for i in 0..512 {
             let key = format!("key{}", i);
             let value = format!("value{}", i);
             let value_opt = Some(value.clone());
@@ -196,7 +196,7 @@ mod tests {
 
         let mut copy_memtable = memtable.clone();
 
-        for i in 0..256 {
+        for i in 0..512 {
             let key = format!("key{}", i);
             let mut value = copy_memtable.get(&key).unwrap().as_ref().unwrap().clone();
             value = format!("{}actual", value);
@@ -208,7 +208,7 @@ mod tests {
             copy_memtable.remove(&key);
         }
 
-        for i in 0..256 {
+        for i in 0..512 {
             let key = format!("key{}", i);
             assert_eq!(tm.read(&key), memtable.get(&key.clone()).unwrap().clone());
         }
@@ -338,37 +338,37 @@ mod tests {
         // check if wal is cleared
         // check if sstable is created
 
-        for i in 0..63 {
+        for i in 0..255 {
             let key = i;
             let value = i;
             lsm.put(key, value).expect("put failed");
         }
 
         assert_ne!(lsm.memtable.read().unwrap().len(), 0);
-        lsm.put(63, 63).expect("put failed");
+        lsm.put(256, 256).expect("put failed");
         assert_eq!(lsm.memtable.read().unwrap().len(), 0);
         assert_eq!(lsm.wal.lock().unwrap().file.metadata().unwrap().len(), 0);
         assert!(lsm.table_manager.lock().unwrap().sstables[0].exists());
 
-        for i in 0..64 {
+        for i in 0..255 {
             assert_eq!(lsm.table_manager.lock().unwrap().read(&i), Some(i));
             assert_eq!(lsm.get(&i), Some(i));
         }
 
-        for i in 64..127 {
+        for i in 256..511 {
             let key = i;
             let value = i;
             lsm.put(key, value).expect("put failed");
         }
 
         assert_ne!(lsm.memtable.read().unwrap().len(), 0);
-        lsm.put(127, 127).expect("put failed");
+        lsm.put(255, 255).expect("put failed");
         assert_eq!(lsm.memtable.read().unwrap().len(), 0);
         assert_eq!(lsm.wal.lock().unwrap().file.metadata().unwrap().len(), 0);
         assert!(lsm.table_manager.lock().unwrap().sstables[1].exists());
         assert!(lsm.table_manager.lock().unwrap().sstables[0].exists());
 
-        for i in 0..128 {
+        for i in 0..256 {
             assert_eq!(lsm.table_manager.lock().unwrap().read(&i), Some(i));
             assert_eq!(lsm.get(&i), Some(i));
         }
@@ -722,7 +722,7 @@ mod tests {
 
     fn benchmark<TM: TableManager<String, String>>(name: String, time_wtr: &mut Writer<File>, space_wtr: &mut Writer<File>) {
         let n = 25_000;
-        let iterations = 10;
+        let iterations = 1;
         let p = Path::new("test/benchmark");
 
         let benchmarks = [deleteseq::<TM>, deleterand::<TM>, readseq::<TM>, readrand::<TM>, readmissing::<TM>, readhot::<TM>, overwrite::<TM>]; 
@@ -796,10 +796,10 @@ mod tests {
         space_wtr.write_record(benchmark_header).expect("CSV write failed");
         space_wtr.flush().expect("CSV flush failed");
 
-        benchmark::<SimpleTableManager<String,String>>("simple".to_string(), &mut time_wtr, &mut space_wtr);
-        benchmark::<SimpleBloomTableManager<String,String>>("bloom".to_string(), &mut time_wtr, &mut space_wtr);
-        benchmark::<SimpleCacheTableManager<String,String>>("cache".to_string(), &mut time_wtr, &mut space_wtr);
-        benchmark::<SimpleCompactTableManager<String,String>>("compact".to_string(), &mut time_wtr, &mut space_wtr);
+        // benchmark::<SimpleTableManager<String,String>>("simple".to_string(), &mut time_wtr, &mut space_wtr);
+        // benchmark::<SimpleBloomTableManager<String,String>>("bloom".to_string(), &mut time_wtr, &mut space_wtr);
+        // benchmark::<SimpleCacheTableManager<String,String>>("cache".to_string(), &mut time_wtr, &mut space_wtr);
+        // benchmark::<SimpleCompactTableManager<String,String>>("compact".to_string(), &mut time_wtr, &mut space_wtr);
         benchmark::<TieredCompactTableManager<String,String>>("tiered".to_string(), &mut time_wtr, &mut space_wtr);
         benchmark::<BCATTableManager<String,String>>("bcat".to_string(), &mut time_wtr, &mut space_wtr);
     }

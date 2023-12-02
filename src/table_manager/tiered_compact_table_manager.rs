@@ -80,7 +80,7 @@ impl<K: LogSerial, V: LogSerial> TieredCompactTableManager<K, V> {
         let mut compact_table = BTreeMap::new();
         let mut name = format!("sstable_{:08}.sst2", self.level2.len());
 
-        if (self.level2.len() >= self.compact_threshold) {
+        if self.level2.len() >= self.compact_threshold {
             name = "sstable_00000000.sst3".to_string();
             match self.level3 {
                 Some(ref level3_path) => {
@@ -140,9 +140,13 @@ impl<K: LogSerial, V: LogSerial> TieredCompactTableManager<K, V> {
         self.tm.sstables.clear();
 
         let path = self.tm.path.join(&name);
-        self.level2.push(path.clone());
-        self.level2.sort();
-        //let mut file = File::create(self.path.join(name))?;
+        if name.ends_with("2") {
+            self.level2.push(path.clone());
+            self.level2.sort();
+        } else {
+            self.level3 = Some(path.clone());
+        }
+        
         let mut file = fs::OpenOptions::new()
             .create(true)
             .read(true)
