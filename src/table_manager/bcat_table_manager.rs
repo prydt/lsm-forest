@@ -64,8 +64,8 @@ impl<K: LogSerial, V: LogSerial> TableManager<K, V> for BCATTableManager<K, V> {
         search_files.append(&mut level2);
         search_files.append(&mut level1);
 
-        let estimate_max_count = 100000;
-        let fp_rate = 0.01;
+        let estimate_max_count = 25000;
+        let fp_rate = 0.05;
 
         let mut memtable = BTreeMap::new();
         let mut bloom = Bloom::new_for_fp_rate(estimate_max_count, fp_rate);

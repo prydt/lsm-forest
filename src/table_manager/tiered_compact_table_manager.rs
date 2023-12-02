@@ -45,7 +45,7 @@ impl<K: LogSerial, V: LogSerial> TableManager<K, V> for TieredCompactTableManage
             tm: SimpleTableManager::<K, V>::new(p),
             level2,
             level3,
-            compact_threshold: 10, // DEFAULT of 10
+            compact_threshold: 5, // DEFAULT of 5
         }
     }
 
@@ -80,7 +80,7 @@ impl<K: LogSerial, V: LogSerial> TieredCompactTableManager<K, V> {
         let mut compact_table = BTreeMap::new();
         let mut name = format!("sstable_{:08}.sst2", self.level2.len());
 
-        if (self.level2.len() >= self.compact_threshold / 2) {
+        if (self.level2.len() >= self.compact_threshold) {
             name = "sstable_00000000.sst3".to_string();
             match self.level3 {
                 Some(ref level3_path) => {

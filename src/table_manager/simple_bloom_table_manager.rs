@@ -48,8 +48,8 @@ impl<K: LogSerial, V: LogSerial> TableManager<K, V> for SimpleBloomTableManager<
 
         sstables.sort();
 
-        let estimate_max_count = 100000;
-        let fp_rate = 0.01;
+        let estimate_max_count = 25000;
+        let fp_rate = 0.05;
 
         let mut memtable = BTreeMap::new();
         let mut bloom = Bloom::new_for_fp_rate(estimate_max_count, fp_rate);
