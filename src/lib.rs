@@ -30,6 +30,8 @@ use crate::table_manager::simple_compact_table_manager::*;
 use crate::table_manager::simple_table_manager::*;
 use crate::table_manager::simple_bloom_table_manager::*;
 use crate::table_manager::simple_cache_table_manager::*;
+use crate::table_manager::tiered_compact_table_manager::*;
+use crate::table_manager::bcat_table_manager::*;
 
 const TEST_N: i64 = 4096;
 
@@ -719,8 +721,8 @@ mod tests {
 
 
     fn benchmark<TM: TableManager<String, String>>(name: String, time_wtr: &mut Writer<File>, space_wtr: &mut Writer<File>) {
-        let n = 5_000;
-        let iterations = 5;
+        let n = 25_000;
+        let iterations = 10;
         let p = Path::new("test/benchmark");
 
         let benchmarks = [deleteseq::<TM>, deleterand::<TM>, readseq::<TM>, readrand::<TM>, readmissing::<TM>, readhot::<TM>, overwrite::<TM>]; 
@@ -798,5 +800,7 @@ mod tests {
         benchmark::<SimpleBloomTableManager<String,String>>("bloom".to_string(), &mut time_wtr, &mut space_wtr);
         benchmark::<SimpleCacheTableManager<String,String>>("cache".to_string(), &mut time_wtr, &mut space_wtr);
         benchmark::<SimpleCompactTableManager<String,String>>("compact".to_string(), &mut time_wtr, &mut space_wtr);
+        benchmark::<TieredCompactTableManager<String,String>>("tiered".to_string(), &mut time_wtr, &mut space_wtr);
+        benchmark::<BCATTableManager<String,String>>("bcat".to_string(), &mut time_wtr, &mut space_wtr);
     }
 }

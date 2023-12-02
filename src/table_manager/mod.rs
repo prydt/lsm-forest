@@ -13,6 +13,7 @@ pub mod simple_compact_table_manager;
 pub mod simple_bloom_table_manager;
 pub mod simple_cache_table_manager;
 pub mod tiered_compact_table_manager;
+pub mod bcat_table_manager;
 
 pub trait TableManager<K: LogSerial, V: LogSerial> {
     fn new(p: &Path) -> Self;

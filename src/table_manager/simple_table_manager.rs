@@ -79,6 +79,7 @@ impl<K: LogSerial, V: LogSerial> TableManager<K, V> for SimpleTableManager<K, V>
         // reversed_sstables.rev();
         // println!("searching for key {:?}", key);
         // println!("sstables: {:?}", self.sstables);
+        self.sstables.sort();
         for path in self.sstables.iter().rev() {
             let f = File::open(path).unwrap();
             // println!("read from {:?}", path);

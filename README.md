@@ -5,15 +5,15 @@
     - rwlock for memtable
     - one giant lock for sstables
     - one giant lock for log
-- [ ] bloom filter
-- [ ] compaction
+- [x] bloom filter
+- [x] compaction
     - [x] simple: many files into 1
-    - [ ] advanced: second level compacts files from first level after threshold. third level compacts files from second and third level after threshold.
+    - [x] advanced: second level compacts files from first level after threshold. third level compacts files from second and third level after threshold.
 - [x] log recovery
     - add log.delete
     - ~~move log.recovery to log.new~~
 - [x] lsm tree recovery
-- [ ] read cache in table_manager
+- [x] read cache in table_manager
 - [ ] add multithreading to sstable read
 - [ ] fix should_flush, account for wal length
 
