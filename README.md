@@ -15,7 +15,7 @@
 - [x] lsm tree recovery
 - [x] read cache in table_manager
 - [ ] add multithreading to sstable read
-- [ ] fix should_flush, account for wal length
+- [x] fix should_flush, account for wal length
 
 
 
