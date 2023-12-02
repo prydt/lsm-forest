@@ -46,18 +46,11 @@ impl<'a, K: LogSerial, V: LogSerial, TM: TableManager<K, V>> LSMTree<'a, K, V, T
         }
     }
 
-    // TODO TEST
     pub fn get(&self, key: &K) -> Option<V> {
         // look at memtable
         match self.memtable.read().unwrap().get(&key) {
-            Some(value) => {
-                // println!("memtable hit {:?}: {:?}", key, value.clone().unwrap());
-                value.clone()
-            }
-            None => {
-                // println!("memtable miss {:?}", key);
-                self.table_manager.lock().unwrap().read(&key)
-            }
+            Some(value) => value.clone(),
+            None => self.table_manager.lock().unwrap().read(&key),
         }
     }
 
@@ -87,10 +80,6 @@ impl<'a, K: LogSerial, V: LogSerial, TM: TableManager<K, V>> LSMTree<'a, K, V, T
 
             if tm_lock.should_flush(&wal_lock, &&memtable_lock) {
                 self.flush_memtable_helper(wal_lock, memtable_lock, tm_lock)?;
-                // drop(wal_lock);
-                // println!("start flushing");
-                // self.flush_memtable()?;
-                // println!("stop flushing");
             }
         }
 
@@ -102,7 +91,6 @@ impl<'a, K: LogSerial, V: LogSerial, TM: TableManager<K, V>> LSMTree<'a, K, V, T
     }
 
     pub fn remove(&self, key: &K) -> Result<()> {
-        // self.put(key.clone(), None)
         self.put_helper(key.clone(), None)
     }
 
@@ -112,8 +100,6 @@ impl<'a, K: LogSerial, V: LogSerial, TM: TableManager<K, V>> LSMTree<'a, K, V, T
         mut memtable_lock: RwLockWriteGuard<BTreeMap<K, Option<V>>>,
         mut tm_lock: MutexGuard<&mut TM>,
     ) -> Result<()> {
-        // todo!()
-
         tm_lock.add_table(memtable_lock.clone())?;
 
         memtable_lock.clear();

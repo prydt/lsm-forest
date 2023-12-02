@@ -79,7 +79,6 @@ impl<K: LogSerial, V: LogSerial> TableManager<K, V> for BCATTableManager<K, V> {
                 _,
             >(&mut reader, bincode::config::standard())
             {
-                // println!("read entry {:?}", entry);
                 if entry.value != None {
                     memtable.insert(entry.key, entry.value);
                 }
@@ -110,6 +109,9 @@ impl<K: LogSerial, V: LogSerial> TableManager<K, V> for BCATTableManager<K, V> {
                     self.bloom.set(key);
                 }
                 None => {}
+            }
+            if self.cache.contains(key) {
+                self.cache.put(key.clone(), value.clone());
             }
         }
 

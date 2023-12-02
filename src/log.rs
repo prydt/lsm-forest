@@ -21,7 +21,6 @@ pub struct Log {
 #[derive(Encode, Decode, Debug)]
 pub struct LogEntry<K: LogSerial, V: LogSerial> {
     pub crc: u32,
-    // pub is_delete: bool,
     pub key: K,
     pub value: V,
 }
@@ -30,7 +29,6 @@ impl<K: LogSerial, V: LogSerial> LogEntry<K, Option<V>> {
     pub fn compute_crc(&self) -> u32 {
         let mut hasher = crc32fast::Hasher::new();
         let mut h = DefaultHasher::new();
-        // self.is_delete.hash(&mut h);
         self.key.hash(&mut h);
         self.value.hash(&mut h);
         hasher.update(&h.finish().to_le_bytes());
@@ -56,7 +54,10 @@ impl Log {
             .open(path)
             .unwrap();
 
-        Log { file, path: path.to_path_buf() }
+        Log {
+            file,
+            path: path.to_path_buf(),
+        }
     }
 
     pub fn append<K: LogSerial, V: LogSerial>(
@@ -90,12 +91,8 @@ impl Log {
     }
 
     pub fn clear(&mut self) -> Result<()> {
-        // self.file.set_len(0)?;
-        // fs::remove_file(self.file.path)?;
-        // self.file.flush()?;
-        // self.file.sync_all()?;
         fs::remove_file(&self.path)?;
-        
+
         self.file = fs::OpenOptions::new()
             .create(true)
             .read(true)

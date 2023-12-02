@@ -75,14 +75,9 @@ impl<K: LogSerial, V: LogSerial> TableManager<K, V> for SimpleTableManager<K, V>
     }
 
     fn read(&mut self, key: &K) -> Option<V> {
-        // let mut reversed_sstables = self.sstables.clone();
-        // reversed_sstables.rev();
-        // println!("searching for key {:?}", key);
-        // println!("sstables: {:?}", self.sstables);
         self.sstables.sort();
         for path in self.sstables.iter().rev() {
             let f = File::open(path).unwrap();
-            // println!("read from {:?}", path);
             let mut reader = std::io::BufReader::new(&f);
             while let Ok(entry) = bincode::decode_from_reader::<
                 SimpleTableEntry<K, V>,
@@ -90,7 +85,6 @@ impl<K: LogSerial, V: LogSerial> TableManager<K, V> for SimpleTableManager<K, V>
                 _,
             >(&mut reader, bincode::config::standard())
             {
-                // println!("read entry {:?}", entry);
                 if entry.key == key.clone() {
                     return entry.value;
                 } else if entry.key > key.clone() {
@@ -102,8 +96,6 @@ impl<K: LogSerial, V: LogSerial> TableManager<K, V> for SimpleTableManager<K, V>
     }
 
     fn should_flush(&self, wal: &Log, memtable: &BTreeMap<K, Option<V>>) -> bool {
-        // TODO check if wal is too big
-
         memtable.len() >= 256 || wal.file.metadata().unwrap().len() >= (4 * 1024)
     }
 }

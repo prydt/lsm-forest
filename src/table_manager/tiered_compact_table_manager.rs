@@ -54,12 +54,13 @@ impl<K: LogSerial, V: LogSerial> TableManager<K, V> for TieredCompactTableManage
         if self.tm.sstables.len() >= self.compact_threshold {
             self.compact()?;
         }
+        self.level2.sort();
 
         Ok(())
     }
 
     fn read(&mut self, key: &K) -> Option<V> {
-        self.tm.read(key)
+        self.search_files(self.tm.sstables.clone(), key)
             .or(self.search_files(self.level2.clone(), key))
             .or({
                 if let Some(ref level3_path) = self.level3 {
@@ -68,6 +69,7 @@ impl<K: LogSerial, V: LogSerial> TableManager<K, V> for TieredCompactTableManage
                     None
                 }
             })
+            .unwrap()
     }
 
     fn should_flush(&self, wal: &Log, memtable: &BTreeMap<K, Option<V>>) -> bool {
@@ -146,7 +148,7 @@ impl<K: LogSerial, V: LogSerial> TieredCompactTableManager<K, V> {
         } else {
             self.level3 = Some(path.clone());
         }
-        
+
         let mut file = fs::OpenOptions::new()
             .create(true)
             .read(true)
@@ -163,7 +165,8 @@ impl<K: LogSerial, V: LogSerial> TieredCompactTableManager<K, V> {
         Ok(())
     }
 
-    fn search_files(&mut self, files: Vec<PathBuf>, key: &K) -> Option<V> {
+    fn search_files(&mut self, mut files: Vec<PathBuf>, key: &K) -> Option<Option<V>> {
+        files.sort();
         for path in files.iter().rev() {
             let f = File::open(path).unwrap();
             let mut reader = std::io::BufReader::new(&f);
@@ -174,7 +177,7 @@ impl<K: LogSerial, V: LogSerial> TieredCompactTableManager<K, V> {
             >(&mut reader, bincode::config::standard())
             {
                 if entry.key == key.clone() {
-                    return entry.value;
+                    return Some(entry.value);
                 } else if entry.key > key.clone() {
                     break;
                 }

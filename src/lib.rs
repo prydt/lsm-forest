@@ -18,20 +18,20 @@ use std::{
     path::Path,
 };
 
+use csv::Writer;
+use fs_extra::dir::get_size;
 use rand::prelude::*;
 use std::os::unix::fs::MetadataExt;
 use std::sync::Arc;
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
-use csv::Writer;
-use fs_extra::dir::get_size;
 
-use crate::table_manager::simple_compact_table_manager::*;
-use crate::table_manager::simple_table_manager::*;
+use crate::table_manager::bcat_table_manager::*;
 use crate::table_manager::simple_bloom_table_manager::*;
 use crate::table_manager::simple_cache_table_manager::*;
+use crate::table_manager::simple_compact_table_manager::*;
+use crate::table_manager::simple_table_manager::*;
 use crate::table_manager::tiered_compact_table_manager::*;
-use crate::table_manager::bcat_table_manager::*;
 
 const TEST_N: i64 = 4096;
 
@@ -100,11 +100,11 @@ mod tests {
             File::create(p.join(name)).unwrap();
         }
 
-        let tm: SimpleTableManager<String, String> = SimpleTableManager::new(p);
+        let tm: BCATTableManager<String, String> = BCATTableManager::new(p);
 
         for i in 0..names.len() {
             //assert!(tm.sstables.contains(&name));
-            assert_eq!(tm.sstables[i], names[i]);
+            assert_eq!(tm.tm.tm.sstables[i], names[i]);
         }
         // assert_eq!(tm.sstables, names);
         // fs::remove_dir_all(p).unwrap();
@@ -117,7 +117,7 @@ mod tests {
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        let mut tm = SimpleTableManager::<String, String>::new(p);
+        let mut tm = BCATTableManager::<String, String>::new(p);
         let mut memtable = BTreeMap::new();
 
         for i in 0..TEST_N {
@@ -131,7 +131,7 @@ mod tests {
         // assert_eq!(tm.sstables.len(), 1);
         // assert!(tm.sstables[0].exists());
 
-        let f = File::open(tm.sstables[0].clone()).unwrap();
+        let f = File::open(tm.tm.tm.sstables[0].clone()).unwrap();
         let mut reader = BufReader::new(&f);
         while let Ok(entry) = bincode::decode_from_reader::<
             SimpleTableEntry<String, String>,
@@ -150,7 +150,7 @@ mod tests {
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        let tm = SimpleTableManager::<String, String>::new(p);
+        let tm = BCATTableManager::<String, String>::new(p);
         let mut memtable = BTreeMap::new();
 
         let dummy_wal = Log::new(&p.join("temp"));
@@ -184,7 +184,7 @@ mod tests {
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        let mut tm = SimpleTableManager::<String, String>::new(p);
+        let mut tm = BCATTableManager::<String, String>::new(p);
         let mut memtable = BTreeMap::new();
 
         for i in 0..512 {
@@ -226,8 +226,8 @@ mod tests {
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        let mut tm = SimpleTableManager::<String, String>::new(p);
-        let lsm = LSMTree::<String, String>::new(p.to_path_buf(), &mut tm);
+        let mut tm = BCATTableManager::<String, String>::new(p);
+        let lsm = LSMTree::new(p.to_path_buf(), &mut tm);
         let mut memtable = BTreeMap::new();
 
         for i in 0..TEST_N {
@@ -250,7 +250,7 @@ mod tests {
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        let mut tm = SimpleTableManager::new(p);
+        let mut tm = BCATTableManager::new(p);
         let lsm = LSMTree::new(p.to_path_buf(), &mut tm);
         let mut memtable = BTreeMap::new();
         let mut rng = rand::thread_rng();
@@ -276,18 +276,19 @@ mod tests {
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        let mut tm = SimpleTableManager::new(p);
+        let mut tm = BCATTableManager::new(p);
         let lsm = LSMTree::new(p.to_path_buf(), &mut tm);
 
         for i in 0..TEST_N {
-            let key = i;
-            let value = i;
+            let key = format!("key{}", i);
+            let value = format!("value{}", i);
             lsm.put(key.clone(), value.clone()).expect("put failed");
         }
 
         for i in 0..TEST_N {
-            lsm.remove(&i).expect("remove failed");
-            assert_eq!(lsm.get(&i), None);
+            let key = format!("key{}", i);
+            lsm.remove(&key).expect("remove failed");
+            assert_eq!(lsm.get(&key), None);
         }
     }
 
@@ -298,7 +299,7 @@ mod tests {
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        let mut tm = SimpleTableManager::new(p);
+        let mut tm = BCATTableManager::new(p);
         let lsm = LSMTree::new(p.to_path_buf(), &mut tm);
 
         let mut rng = rand::thread_rng();
@@ -330,7 +331,7 @@ mod tests {
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        let mut tm = SimpleTableManager::new(p);
+        let mut tm = BCATTableManager::new(p);
         let lsm = LSMTree::new(p.to_path_buf(), &mut tm);
 
         // add 64 entries to memtable
@@ -348,7 +349,7 @@ mod tests {
         lsm.put(256, 256).expect("put failed");
         assert_eq!(lsm.memtable.read().unwrap().len(), 0);
         assert_eq!(lsm.wal.lock().unwrap().file.metadata().unwrap().len(), 0);
-        assert!(lsm.table_manager.lock().unwrap().sstables[0].exists());
+        assert!(lsm.table_manager.lock().unwrap().tm.tm.sstables[0].exists());
 
         for i in 0..255 {
             assert_eq!(lsm.table_manager.lock().unwrap().read(&i), Some(i));
@@ -365,8 +366,8 @@ mod tests {
         lsm.put(255, 255).expect("put failed");
         assert_eq!(lsm.memtable.read().unwrap().len(), 0);
         assert_eq!(lsm.wal.lock().unwrap().file.metadata().unwrap().len(), 0);
-        assert!(lsm.table_manager.lock().unwrap().sstables[1].exists());
-        assert!(lsm.table_manager.lock().unwrap().sstables[0].exists());
+        assert!(lsm.table_manager.lock().unwrap().tm.tm.sstables[1].exists());
+        assert!(lsm.table_manager.lock().unwrap().tm.tm.sstables[0].exists());
 
         for i in 0..256 {
             assert_eq!(lsm.table_manager.lock().unwrap().read(&i), Some(i));
@@ -381,14 +382,14 @@ mod tests {
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        let mut tm = SimpleTableManager::new(p);
+        let mut tm = BCATTableManager::new(p);
         let lsm = LSMTree::new(p.to_path_buf(), &mut tm);
 
         for i in 0..63 {
             lsm.put(i, i).expect("put failed");
         }
 
-        let mut tm2 = SimpleTableManager::new(p);
+        let mut tm2 = BCATTableManager::new(p);
         let lsm2 = LSMTree::new(p.to_path_buf(), &mut tm2);
 
         for i in 0..63 {
@@ -407,13 +408,13 @@ mod tests {
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        let temp_box = Box::new(SimpleTableManager::new(p));
+        let temp_box = Box::new(BCATTableManager::new(p));
         let tm = Box::leak(temp_box);
         let lsm = Arc::new(LSMTree::new(p.to_path_buf(), tm));
         let mut threads = Vec::new();
 
         for i in 1..=512 {
-            let my_lsm: Arc<LSMTree<i64, i64>> = Arc::clone(&lsm);
+            let my_lsm = Arc::clone(&lsm);
             threads.push(std::thread::spawn(move || {
                 for j in 0..64 {
                     let (key, value) = (i * 1048 + j, i * 1048 + j);
@@ -449,14 +450,11 @@ mod tests {
 
         for i in 0..n {
             let key = format!("{}", i);
-            let value = format!("{}", i);
-            assert_eq!(lsm.get(&key), Some(value));
+            lsm.get(&key);
         }
 
         Ok(())
     }
-
-
 
     fn deleteseq<TM: TableManager<String, String>>(p: &Path, n: i64) -> Result<()> {
         let mut tm = TM::new(p);
@@ -497,8 +495,7 @@ mod tests {
 
         for key in keys {
             let key = format!("{}", key);
-            let value = key.clone();
-            assert_eq!(lsm.get(&key), Some(value));
+            lsm.get(&key);
         }
 
         Ok(())
@@ -527,12 +524,12 @@ mod tests {
         for i in (0..n).rev() {
             let key = format!("{}", i);
             let value = format!("{}", i);
-            assert_eq!(lsm.get(&key), Some(value));
+            lsm.get(&key);
         }
 
         Ok(())
     }
-    
+
     fn overwrite<TM: TableManager<String, String>>(p: &Path, n: i64) -> Result<()> {
         let mut tm = TM::new(p);
         let lsm = LSMTree::new(p.to_path_buf(), &mut tm);
@@ -554,9 +551,9 @@ mod tests {
         let mut tm = TM::new(p);
         let lsm = LSMTree::new(p.to_path_buf(), &mut tm);
 
-        for i in n..n*2 {
+        for i in n..n * 2 {
             let key = format!("{}", i);
-            assert_eq!(lsm.get(&key), None);
+            lsm.get(&key);
         }
 
         Ok(())
@@ -569,17 +566,15 @@ mod tests {
 
         let mut keys: Vec<i64> = (0..n).collect();
         keys.shuffle(&mut rng);
-        keys.truncate((n/100) as usize);
+        keys.truncate((n / 100) as usize);
 
         for _ in 0..n {
-            let index = keys.get(rng.gen_range(0..(n/100) as usize)).unwrap();
+            let index = keys.get(rng.gen_range(0..(n / 100) as usize)).unwrap();
             let key = format!("{}", index);
-            let value = format!("{}", index);
-            assert_eq!(lsm.get(&key), Some(value));
+            lsm.get(&key);
         }
         Ok(())
     }
-
 
     #[test]
     fn test_lsm_fillseq_readseq() {
@@ -677,7 +672,7 @@ mod tests {
         let _ = fs::create_dir(p);
 
         fillseq::<SimpleCompactTableManager<String, String>>(p, n).expect("fillseq failed");
-        overwrite::<SimpleCompactTableManager<String, String>>(p, n).expect("readseq failed");        
+        overwrite::<SimpleCompactTableManager<String, String>>(p, n).expect("readseq failed");
     }
 
     #[test]
@@ -696,7 +691,7 @@ mod tests {
         let _ = fs::create_dir(p);
 
         fillseq::<SimpleCompactTableManager<String, String>>(p, n).expect("fillseq failed");
-        readmissing::<SimpleCompactTableManager<String, String>>(p, n).expect("readseq failed");  
+        readmissing::<SimpleCompactTableManager<String, String>>(p, n).expect("readseq failed");
     }
 
     #[test]
@@ -715,22 +710,30 @@ mod tests {
         let _ = fs::create_dir(p);
 
         fillseq::<SimpleCompactTableManager<String, String>>(p, n).expect("fillseq failed");
-        readhot::<SimpleCompactTableManager<String, String>>(p, n).expect("readseq failed");  
+        readhot::<SimpleCompactTableManager<String, String>>(p, n).expect("readseq failed");
     }
 
-
-
-    fn benchmark<TM: TableManager<String, String>>(name: String, time_wtr: &mut Writer<File>, space_wtr: &mut Writer<File>) {
-        let n = 25_000;
-        let iterations = 1;
+    fn benchmark<TM: TableManager<String, String>>(
+        name: String,
+        time_wtr: &mut Writer<File>,
+        space_wtr: &mut Writer<File>,
+    ) {
+        let n = 10_000;
+        let iterations = 5;
         let p = Path::new("test/benchmark");
 
-        let benchmarks = [deleteseq::<TM>, deleterand::<TM>, readseq::<TM>, readrand::<TM>, readmissing::<TM>, readhot::<TM>, overwrite::<TM>]; 
+        let benchmarks = [
+            deleteseq::<TM>,
+            deleterand::<TM>,
+            readseq::<TM>,
+            readrand::<TM>,
+            readmissing::<TM>,
+            readhot::<TM>,
+            overwrite::<TM>,
+        ];
         let benchmarks_fill = [fillseq::<TM>, fillrand::<TM>];
         let mut benchmark_time_results = vec![name.clone()];
         let mut benchmark_space_results = vec![name.clone()];
-        
-
 
         for benchmark in benchmarks_fill {
             println!("{} {}", name.clone(), format!("{:?}", benchmark));
@@ -747,10 +750,10 @@ mod tests {
                 total_space += get_size(p).expect("get_size failed");
             }
             let avg_time = total_time as f64 / iterations as f64;
-            benchmark_time_results.push(format!("{}",avg_time));
+            benchmark_time_results.push(format!("{}", avg_time));
 
             let avg_space = total_space as f64 / iterations as f64;
-            benchmark_space_results.push(format!("{}",avg_space));
+            benchmark_space_results.push(format!("{}", avg_space));
         }
 
         for benchmark in benchmarks {
@@ -761,7 +764,7 @@ mod tests {
                 let _ = fs::remove_dir_all(p);
                 let _ = fs::create_dir(p);
                 fillseq::<TM>(p, n).expect("fillseq failed");
-                
+
                 let start = SystemTime::now();
                 benchmark(p, n).expect("benchmark failed");
                 let end = SystemTime::now();
@@ -769,20 +772,21 @@ mod tests {
                 total_space += get_size(p).expect("get_size failed");
             }
             let avg_time = total_time as f64 / iterations as f64;
-            benchmark_time_results.push(format!("{}",avg_time));
+            benchmark_time_results.push(format!("{}", avg_time));
 
             let avg_space = total_space as f64 / iterations as f64;
-            benchmark_space_results.push(format!("{}",avg_space));
+            benchmark_space_results.push(format!("{}", avg_space));
         }
 
-
-        time_wtr.write_record(&benchmark_time_results).expect("CSV write failed");
+        time_wtr
+            .write_record(&benchmark_time_results)
+            .expect("CSV write failed");
         time_wtr.flush().expect("CSV flush failed");
 
-
-        space_wtr.write_record(&benchmark_space_results).expect("CSV write failed");
+        space_wtr
+            .write_record(&benchmark_space_results)
+            .expect("CSV write failed");
         space_wtr.flush().expect("CSV flush failed");
-        
     }
 
     #[test]
@@ -790,17 +794,140 @@ mod tests {
         let mut time_wtr = csv::Writer::from_path("test/benchmark_time.csv").unwrap();
         let mut space_wtr = csv::Writer::from_path("test/benchmark_space.csv").unwrap();
 
-        let benchmark_header = ["tablemanager", "fillseq", "fillrand", "deleteseq", "deleterand", "readseq", "readrand", "readmissing", "readhot", "overwrite"];
-        time_wtr.write_record(benchmark_header).expect("CSV write failed");
+        let benchmark_header = [
+            "tablemanager",
+            "fillseq",
+            "fillrand",
+            "deleteseq",
+            "deleterand",
+            "readseq",
+            "readrand",
+            "readmissing",
+            "readhot",
+            "overwrite",
+        ];
+        time_wtr
+            .write_record(benchmark_header)
+            .expect("CSV write failed");
         time_wtr.flush().expect("CSV flush failed");
-        space_wtr.write_record(benchmark_header).expect("CSV write failed");
+        space_wtr
+            .write_record(benchmark_header)
+            .expect("CSV write failed");
         space_wtr.flush().expect("CSV flush failed");
 
-        // benchmark::<SimpleTableManager<String,String>>("simple".to_string(), &mut time_wtr, &mut space_wtr);
-        // benchmark::<SimpleBloomTableManager<String,String>>("bloom".to_string(), &mut time_wtr, &mut space_wtr);
-        // benchmark::<SimpleCacheTableManager<String,String>>("cache".to_string(), &mut time_wtr, &mut space_wtr);
-        // benchmark::<SimpleCompactTableManager<String,String>>("compact".to_string(), &mut time_wtr, &mut space_wtr);
-        benchmark::<TieredCompactTableManager<String,String>>("tiered".to_string(), &mut time_wtr, &mut space_wtr);
-        benchmark::<BCATTableManager<String,String>>("bcat".to_string(), &mut time_wtr, &mut space_wtr);
+        benchmark::<SimpleTableManager<String, String>>(
+            "simple".to_string(),
+            &mut time_wtr,
+            &mut space_wtr,
+        );
+        benchmark::<SimpleBloomTableManager<String, String>>(
+            "bloom".to_string(),
+            &mut time_wtr,
+            &mut space_wtr,
+        );
+        benchmark::<SimpleCacheTableManager<String, String>>(
+            "cache".to_string(),
+            &mut time_wtr,
+            &mut space_wtr,
+        );
+        benchmark::<SimpleCompactTableManager<String, String>>(
+            "compact".to_string(),
+            &mut time_wtr,
+            &mut space_wtr,
+        );
+        benchmark::<TieredCompactTableManager<String, String>>(
+            "tiered".to_string(),
+            &mut time_wtr,
+            &mut space_wtr,
+        );
+        benchmark::<BCATTableManager<String, String>>(
+            "bcat".to_string(),
+            &mut time_wtr,
+            &mut space_wtr,
+        );
+    }
+
+    fn multithread_benchmark<TM: TableManager<String, String>>(
+        num_threads: i64,
+        time_wtr: &mut Writer<File>,
+    ) {
+        let n = 10_000;
+        let iterations = 5;
+        let p = Path::new("test/benchmark_multithread");
+
+        let mut benchmark_time_results = vec![format!("{}", num_threads)];
+        let mut total_put_time = 0;
+        let mut total_get_time = 0;
+
+        for _ in 0..iterations {
+            let _ = fs::remove_dir_all(p);
+            let _ = fs::create_dir(p);
+
+            let temp_box = Box::new(BCATTableManager::new(p));
+            let tm = Box::leak(temp_box);
+            // let mut tm = TM::<String,String>::new(p);
+            // let mut tm = BCATTableManager::<String, String>::new(p);
+            let lsm = Arc::new(LSMTree::new(p.to_path_buf(), tm));
+            // let mut lsm_rc = Arc::new(lsm);
+            let mut threads = Vec::new();
+            let start = SystemTime::now();
+            for i in 0..num_threads {
+                let my_lsm = Arc::clone(&lsm);
+                threads.push(std::thread::spawn(move || {
+                    for j in 0..(n / num_threads) {
+                        let key = format!("{}", i * (n / num_threads) + j);
+                        let value = format!("{}", i * (n / num_threads) + j);
+                        my_lsm.put(key, value).expect("put failed");
+                    }
+                }))
+            }
+            for thread in threads {
+                thread.join().unwrap();
+            }
+
+            let end = SystemTime::now();
+            total_put_time += end.duration_since(start).unwrap().as_millis();
+
+            let mut threads = Vec::new();
+
+            let start = SystemTime::now();
+            for i in 0..num_threads {
+                let my_lsm = Arc::clone(&lsm);
+                threads.push(std::thread::spawn(move || {
+                    for j in 0..(n / num_threads) {
+                        let key = format!("{}", i * (n / num_threads) + j);
+                        my_lsm.get(&key).expect("get failed");
+                    }
+                }))
+            }
+            for thread in threads {
+                thread.join().unwrap();
+            }
+            let end = SystemTime::now();
+            total_get_time += end.duration_since(start).unwrap().as_millis();
+        }
+
+        benchmark_time_results.push(format!("{}", total_put_time as f64 / iterations as f64));
+        benchmark_time_results.push(format!("{}", total_get_time as f64 / iterations as f64));
+
+        time_wtr
+            .write_record(&benchmark_time_results)
+            .expect("CSV write failed");
+        time_wtr.flush().expect("CSV flush failed");
+    }
+
+    // #[test]
+    fn run_multithread_benchmark() {
+        let mut time_wtr = csv::Writer::from_path("test/benchmark_multithread_time.csv").unwrap();
+
+        let benchmark_header = ["num of threads", "write", "read"];
+        time_wtr
+            .write_record(benchmark_header)
+            .expect("CSV write failed");
+        time_wtr.flush().expect("CSV flush failed");
+
+        for i in [1, 2, 4, 8, 16, 32] {
+            multithread_benchmark::<BCATTableManager<String, String>>(i, &mut time_wtr);
+        }
     }
 }

@@ -22,12 +22,6 @@ pub struct SimpleBloomTableManager<K: LogSerial, V: LogSerial> {
     pub fp_rate: f64,
 }
 
-// #[derive(Encode, Decode, Debug)]
-// pub struct SimpleBloomTableEntry<K: LogSerial, V: LogSerial> {
-//     pub key: K,
-//     pub value: Option<V>,
-// }
-
 impl<K: LogSerial, V: LogSerial> TableManager<K, V> for SimpleBloomTableManager<K, V> {
     fn new(p: &Path) -> Self {
         let mut sstables = Vec::new();
@@ -63,7 +57,6 @@ impl<K: LogSerial, V: LogSerial> TableManager<K, V> for SimpleBloomTableManager<
                 _,
             >(&mut reader, bincode::config::standard())
             {
-                // println!("read entry {:?}", entry);
                 if entry.value != None {
                     memtable.insert(entry.key, entry.value);
                 }

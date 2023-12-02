@@ -31,6 +31,12 @@ impl<K: LogSerial, V: LogSerial> TableManager<K, V> for SimpleCacheTableManager<
     }
 
     fn add_table(&mut self, memtable: BTreeMap<K, Option<V>>) -> Result<()> {
+        for (key, value) in memtable.iter() {
+            if self.cache.contains(key) {
+                self.cache.put(key.clone(), value.clone());
+            }
+        }
+
         self.tm.add_table(memtable)
     }
 
