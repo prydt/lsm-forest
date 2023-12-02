@@ -74,7 +74,7 @@ impl<K: LogSerial, V: LogSerial> TableManager<K, V> for SimpleTableManager<K, V>
         Ok(())
     }
 
-    fn read(&self, key: &K) -> Option<V> {
+    fn read(&mut self, key: &K) -> Option<V> {
         // let mut reversed_sstables = self.sstables.clone();
         // reversed_sstables.rev();
         // println!("searching for key {:?}", key);
@@ -103,6 +103,6 @@ impl<K: LogSerial, V: LogSerial> TableManager<K, V> for SimpleTableManager<K, V>
     fn should_flush(&self, wal: &Log, memtable: &BTreeMap<K, Option<V>>) -> bool {
         // TODO check if wal is too big
 
-        memtable.len() >= 64 // || wal.file.metadata().unwrap().len() >= (512 * 1024) S
+        memtable.len() >= 256 // || wal.file.metadata().unwrap().len() >= (512 * 1024) S
     }
 }

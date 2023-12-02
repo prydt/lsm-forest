@@ -11,6 +11,8 @@ bincode = "2.0.0-rc.1"
 bloomfilter = { version = "1.0.12", features = ["serde"] }
 crc32fast = "1.3.2"
 csv = "1.3.0"
+fs_extra = "1.3.0"
+lru = "0.12.1"
 rand = "0.8.5"
 
 [lib]

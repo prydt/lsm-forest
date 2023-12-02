@@ -8,14 +8,18 @@ use std::io::Write;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
-use crate::table_manager::TableManager;
 use crate::table_manager::simple_table_manager::SimpleTableManager;
+use crate::table_manager::TableManager;
 
 use bloomfilter::Bloom;
+
+use super::simple_table_manager::SimpleTableEntry;
 
 pub struct SimpleBloomTableManager<K: LogSerial, V: LogSerial> {
     pub tm: SimpleTableManager<K, V>,
     pub bloom: Bloom<K>,
+    pub estimate_max_count: usize,
+    pub fp_rate: f64,
 }
 
 // #[derive(Encode, Decode, Debug)]
@@ -25,84 +29,86 @@ pub struct SimpleBloomTableManager<K: LogSerial, V: LogSerial> {
 // }
 
 impl<K: LogSerial, V: LogSerial> TableManager<K, V> for SimpleBloomTableManager<K, V> {
-    fn new(p: &Path, estimate_max_count: usize, fp_rate: f64) -> Self {
-        // let mut sstables = Vec::new();
+    fn new(p: &Path) -> Self {
+        let mut sstables = Vec::new();
 
-        // for file in fs::read_dir(p).unwrap() {
-        //     let file = file.unwrap();
-        //     let path = file.path();
+        for file in fs::read_dir(p).unwrap() {
+            let file = file.unwrap();
+            let path = file.path();
 
-        //     match path.extension() {
-        //         Some(ext) => {
-        //             if ext == "sst" {
-        //                 sstables.push(path);
-        //             }
-        //         }
-        //         None => {}
-        //     }
-        // }
-
-        // sstables.sort();
-
-        SimpleBloomTableManager::<K, V>{
-            tm: SimpleTableManager::<K, V>::new(p),
-            bloom: Bloom::new_for_fp_rate(estimate_max_count, fp_rate),
-        
+            match path.extension() {
+                Some(ext) => {
+                    if ext == "sst" {
+                        sstables.push(path);
+                    }
+                }
+                None => {}
+            }
         }
-    }
 
-    fn add_table(&mut self, memtable: BTreeMap<K, Option<V>>) -> Result<()> {
-        // let name = format!("sstable_{:08}.sst", self.sstables.len());
-        // let path = self.path.join(&name);
-        // self.sstables.push(path.clone());
-        // //let mut file = File::create(self.path.join(name))?;
-        // let mut file = fs::OpenOptions::new()
-        //     .create(true)
-        //     .read(true)
-        //     .write(true)
-        //     .open(path)?;
+        sstables.sort();
 
-        // // let payload = bincode::encode_to_vec(&entry, bincode::config::standard())?;
-        // // self.file.write(&payload)?;
-        // // // self.file.flush()?;
-        // for (key, value) in memtable {
-        //     let entry = SimpleBloomTableEntry { key, value };
-        //     let payload = bincode::encode_to_vec(&entry, bincode::config::standard())?;
-        //     file.write(&payload)?;
-        // }
-        // file.flush()?;
-        Ok(())
-    }
+        let estimate_max_count = 100000;
+        let fp_rate = 0.01;
 
-    fn read(&self, key: &K) -> Option<V> {
-        // let mut reversed_sstables = self.sstables.clone();
-        // reversed_sstables.rev();
-        // println!("searching for key {:?}", key);
-        // println!("sstables: {:?}", self.sstables);
-        for path in self.sstables.iter().rev() {
+        let mut memtable = BTreeMap::new();
+        let mut bloom = Bloom::new_for_fp_rate(estimate_max_count, fp_rate);
+
+        for path in sstables.iter() {
             let f = File::open(path).unwrap();
-            // println!("read from {:?}", path);
             let mut reader = std::io::BufReader::new(&f);
             while let Ok(entry) = bincode::decode_from_reader::<
-                SimpleBloomTableEntry<K, V>,
+                SimpleTableEntry<K, V>,
                 &mut std::io::BufReader<&File>,
                 _,
             >(&mut reader, bincode::config::standard())
             {
                 // println!("read entry {:?}", entry);
-                if entry.key == key.clone() {
-                    return entry.value;
-                } else if entry.key > key.clone() {
-                    break;
+                if entry.value != None {
+                    memtable.insert(entry.key, entry.value);
                 }
             }
         }
-        None
+
+        for (key, value) in memtable.iter() {
+            match value {
+                Some(_) => {
+                    bloom.set(key);
+                }
+                None => {}
+            }
+        }
+
+        SimpleBloomTableManager::<K, V> {
+            tm: SimpleTableManager::<K, V>::new(p),
+            bloom,
+            estimate_max_count,
+            fp_rate,
+        }
+    }
+
+    fn add_table(&mut self, memtable: BTreeMap<K, Option<V>>) -> Result<()> {
+        for (key, value) in memtable.iter() {
+            match value {
+                Some(_) => {
+                    self.bloom.set(key);
+                }
+                None => {}
+            }
+        }
+
+        self.tm.add_table(memtable)
+    }
+
+    fn read(&mut self, key: &K) -> Option<V> {
+        if self.bloom.check(key) {
+            self.tm.read(key)
+        } else {
+            None
+        }
     }
 
     fn should_flush(&self, wal: &Log, memtable: &BTreeMap<K, Option<V>>) -> bool {
-        // TODO check if wal is too big
-
-        memtable.len() >= 64 // || wal.file.metadata().unwrap().len() >= (512 * 1024) S
+        self.tm.should_flush(wal, memtable)
     }
 }

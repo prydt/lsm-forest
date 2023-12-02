@@ -24,17 +24,17 @@ use std::sync::Arc;
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
 use csv::Writer;
+use fs_extra::dir::get_size;
 
 use crate::table_manager::simple_compact_table_manager::*;
 use crate::table_manager::simple_table_manager::*;
+use crate::table_manager::simple_bloom_table_manager::*;
+use crate::table_manager::simple_cache_table_manager::*;
 
 const TEST_N: i64 = 4096;
 
 #[cfg(test)]
 mod tests {
-
-    use bloomfilter::reexports::serde::de::value;
-
     use super::*;
 
     #[test]
@@ -518,7 +518,7 @@ mod tests {
         Ok(())
     }
 
-    fn readreverse<TM: TableManager<String, String>>(p: &Path, n: i64) -> Result<()> {
+    fn _readreverse<TM: TableManager<String, String>>(p: &Path, n: i64) -> Result<()> {
         let mut tm = TM::new(p);
         let lsm = LSMTree::new(p.to_path_buf(), &mut tm);
 
@@ -581,163 +581,222 @@ mod tests {
 
     #[test]
     fn test_lsm_fillseq_readseq() {
-        let N = 10_000;
+        let n = 10_000;
         let p = Path::new("test/lsm_fillseq_readseq");
 
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        fillseq::<SimpleTableManager<String, String>>(p, N).expect("fillseq failed");
-        readseq::<SimpleTableManager<String, String>>(p, N).expect("readseq failed");
+        fillseq::<SimpleTableManager<String, String>>(p, n).expect("fillseq failed");
+        readseq::<SimpleTableManager<String, String>>(p, n).expect("readseq failed");
 
         let p = Path::new("test/lsm_compact_fillseq_readseq");
 
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        fillseq::<SimpleCompactTableManager<String, String>>(p, N).expect("fillseq failed");
-        readseq::<SimpleCompactTableManager<String, String>>(p, N).expect("readseq failed");
+        fillseq::<SimpleCompactTableManager<String, String>>(p, n).expect("fillseq failed");
+        readseq::<SimpleCompactTableManager<String, String>>(p, n).expect("readseq failed");
     }
 
     #[test]
     fn test_lsm_fillseq_deleteseq() {
-        let N = 10_000;
+        let n = 10_000;
         let p = Path::new("test/lsm_fillseq_deleteseq");
 
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        fillseq::<SimpleTableManager<String, String>>(p, N).expect("fillseq failed");
-        deleteseq::<SimpleTableManager<String, String>>(p, N).expect("readseq failed");
+        fillseq::<SimpleTableManager<String, String>>(p, n).expect("fillseq failed");
+        deleteseq::<SimpleTableManager<String, String>>(p, n).expect("readseq failed");
 
         let p = Path::new("test/lsm_compact_fillseq_deleteseq");
 
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        fillseq::<SimpleCompactTableManager<String, String>>(p, N).expect("fillseq failed");
-        deleteseq::<SimpleCompactTableManager<String, String>>(p, N).expect("readseq failed");
+        fillseq::<SimpleCompactTableManager<String, String>>(p, n).expect("fillseq failed");
+        deleteseq::<SimpleCompactTableManager<String, String>>(p, n).expect("readseq failed");
     }
 
     #[test]
     fn test_lsm_fillrand_readrand() {
-        let N = 10_000;
+        let n = 10_000;
         let p = Path::new("test/lsm_fillrand_readrand");
 
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        fillrand::<SimpleTableManager<String, String>>(p, N).expect("fillseq failed");
-        readrand::<SimpleTableManager<String, String>>(p, N).expect("readseq failed");
+        fillrand::<SimpleTableManager<String, String>>(p, n).expect("fillseq failed");
+        readrand::<SimpleTableManager<String, String>>(p, n).expect("readseq failed");
 
         let p = Path::new("test/lsm_compact_fillrand_readrand");
 
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        fillrand::<SimpleCompactTableManager<String, String>>(p, N).expect("fillseq failed");
-        readrand::<SimpleCompactTableManager<String, String>>(p, N).expect("readseq failed");
+        fillrand::<SimpleCompactTableManager<String, String>>(p, n).expect("fillseq failed");
+        readrand::<SimpleCompactTableManager<String, String>>(p, n).expect("readseq failed");
     }
 
     #[test]
     fn test_lsm_fillrand_deleterand() {
-        let N = 10_000;
+        let n = 10_000;
         let p = Path::new("test/lsm_fillrand_deleterand");
 
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        fillrand::<SimpleTableManager<String, String>>(p, N).expect("fillseq failed");
-        deleterand::<SimpleTableManager<String, String>>(p, N).expect("readseq failed");
+        fillrand::<SimpleTableManager<String, String>>(p, n).expect("fillseq failed");
+        deleterand::<SimpleTableManager<String, String>>(p, n).expect("readseq failed");
 
         let p = Path::new("test/lsm_compact_fillrand_deleterand");
 
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        fillrand::<SimpleCompactTableManager<String, String>>(p, N).expect("fillseq failed");
-        deleterand::<SimpleCompactTableManager<String, String>>(p, N).expect("readseq failed");
+        fillrand::<SimpleCompactTableManager<String, String>>(p, n).expect("fillseq failed");
+        deleterand::<SimpleCompactTableManager<String, String>>(p, n).expect("readseq failed");
     }
 
     #[test]
     fn test_lsm_overwrite() {
-        let N = 10_000;
+        let n = 10_000;
         let p = Path::new("test/lsm_overwrite");
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        fillseq::<SimpleTableManager<String, String>>(p, N).expect("fillseq failed");
-        overwrite::<SimpleTableManager<String, String>>(p, N).expect("readseq failed");
+        fillseq::<SimpleTableManager<String, String>>(p, n).expect("fillseq failed");
+        overwrite::<SimpleTableManager<String, String>>(p, n).expect("readseq failed");
 
         let p = Path::new("test/lsm_compact_overwrite");
 
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        fillseq::<SimpleCompactTableManager<String, String>>(p, N).expect("fillseq failed");
-        overwrite::<SimpleCompactTableManager<String, String>>(p, N).expect("readseq failed");        
+        fillseq::<SimpleCompactTableManager<String, String>>(p, n).expect("fillseq failed");
+        overwrite::<SimpleCompactTableManager<String, String>>(p, n).expect("readseq failed");        
     }
 
     #[test]
     fn test_lsm_readmissing() {
-        let N = 10_000;
+        let n = 10_000;
         let p = Path::new("test/lsm_readmissing");
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        fillseq::<SimpleTableManager<String, String>>(p, N).expect("fillseq failed");
-        readmissing::<SimpleTableManager<String, String>>(p, N).expect("readseq failed");
+        fillseq::<SimpleTableManager<String, String>>(p, n).expect("fillseq failed");
+        readmissing::<SimpleTableManager<String, String>>(p, n).expect("readseq failed");
 
         let p = Path::new("test/lsm_compact_readmissing");
 
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        fillseq::<SimpleCompactTableManager<String, String>>(p, N).expect("fillseq failed");
-        readmissing::<SimpleCompactTableManager<String, String>>(p, N).expect("readseq failed");  
+        fillseq::<SimpleCompactTableManager<String, String>>(p, n).expect("fillseq failed");
+        readmissing::<SimpleCompactTableManager<String, String>>(p, n).expect("readseq failed");  
     }
 
     #[test]
     fn test_lsm_readhot() {
-        let N = 10_000;
+        let n = 10_000;
         let p = Path::new("test/lsm_readhot");
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        fillseq::<SimpleTableManager<String, String>>(p, N).expect("fillseq failed");
-        readhot::<SimpleTableManager<String, String>>(p, N).expect("readseq failed");
+        fillseq::<SimpleTableManager<String, String>>(p, n).expect("fillseq failed");
+        readhot::<SimpleTableManager<String, String>>(p, n).expect("readseq failed");
 
         let p = Path::new("test/lsm_compact_readhot");
 
         let _ = fs::remove_dir_all(p);
         let _ = fs::create_dir(p);
 
-        fillseq::<SimpleCompactTableManager<String, String>>(p, N).expect("fillseq failed");
-        readhot::<SimpleCompactTableManager<String, String>>(p, N).expect("readseq failed");  
+        fillseq::<SimpleCompactTableManager<String, String>>(p, n).expect("fillseq failed");
+        readhot::<SimpleCompactTableManager<String, String>>(p, n).expect("readseq failed");  
     }
 
 
 
-    fn benchmark<TM: TableManager<String, String>>(name: String, wtr: &mut Writer<File>) {
-        let N = 10_000;
+    fn benchmark<TM: TableManager<String, String>>(name: String, time_wtr: &mut Writer<File>, space_wtr: &mut Writer<File>) {
+        let n = 5_000;
         let iterations = 5;
         let p = Path::new("test/benchmark");
-        let _ = fs::remove_dir_all(p);
-        let _ = fs::create_dir(p);
 
-        let benchmarks = [fillseq::<TM>, fillrand::<TM>, deleteseq::<TM>, deleterand::<TM>, readseq::<TM>, readrand::<TM>, readmissing::<TM>, readhot::<TM>, overwrite::<TM>]; 
+        let benchmarks = [deleteseq::<TM>, deleterand::<TM>, readseq::<TM>, readrand::<TM>, readmissing::<TM>, readhot::<TM>, overwrite::<TM>]; 
+        let benchmarks_fill = [fillseq::<TM>, fillrand::<TM>];
+        let mut benchmark_time_results = vec![name.clone()];
+        let mut benchmark_space_results = vec![name.clone()];
+        
 
 
+        for benchmark in benchmarks_fill {
+            println!("{} {}", name.clone(), format!("{:?}", benchmark));
+            let mut total_time = 0;
+            let mut total_space = 0;
+            for _ in 0..iterations {
+                let _ = fs::remove_dir_all(p);
+                let _ = fs::create_dir(p);
 
+                let start = SystemTime::now();
+                benchmark(p, n).expect("benchmark failed");
+                let end = SystemTime::now();
+                total_time += end.duration_since(start).unwrap().as_millis();
+                total_space += get_size(p).expect("get_size failed");
+            }
+            let avg_time = total_time as f64 / iterations as f64;
+            benchmark_time_results.push(format!("{}",avg_time));
+
+            let avg_space = total_space as f64 / iterations as f64;
+            benchmark_space_results.push(format!("{}",avg_space));
+        }
+
+        for benchmark in benchmarks {
+            println!("{} {}", name.clone(), format!("{:?}", benchmark));
+            let mut total_time = 0;
+            let mut total_space = 0;
+            for _ in 0..iterations {
+                let _ = fs::remove_dir_all(p);
+                let _ = fs::create_dir(p);
+                fillseq::<TM>(p, n).expect("fillseq failed");
+                
+                let start = SystemTime::now();
+                benchmark(p, n).expect("benchmark failed");
+                let end = SystemTime::now();
+                total_time += end.duration_since(start).unwrap().as_millis();
+                total_space += get_size(p).expect("get_size failed");
+            }
+            let avg_time = total_time as f64 / iterations as f64;
+            benchmark_time_results.push(format!("{}",avg_time));
+
+            let avg_space = total_space as f64 / iterations as f64;
+            benchmark_space_results.push(format!("{}",avg_space));
+        }
+
+
+        time_wtr.write_record(&benchmark_time_results).expect("CSV write failed");
+        time_wtr.flush().expect("CSV flush failed");
+
+
+        space_wtr.write_record(&benchmark_space_results).expect("CSV write failed");
+        space_wtr.flush().expect("CSV flush failed");
+        
     }
 
     #[test]
     fn run_benchmark() {
-        let mut wtr = csv::Writer::from_path("test/benchmark.csv").unwrap();
+        let mut time_wtr = csv::Writer::from_path("test/benchmark_time.csv").unwrap();
+        let mut space_wtr = csv::Writer::from_path("test/benchmark_space.csv").unwrap();
 
         let benchmark_header = ["tablemanager", "fillseq", "fillrand", "deleteseq", "deleterand", "readseq", "readrand", "readmissing", "readhot", "overwrite"];
+        time_wtr.write_record(benchmark_header).expect("CSV write failed");
+        time_wtr.flush().expect("CSV flush failed");
+        space_wtr.write_record(benchmark_header).expect("CSV write failed");
+        space_wtr.flush().expect("CSV flush failed");
 
-        benchmark::<SimpleTableManager<String,String>>("simple".to_string(), &mut wtr);
-        benchmark::<SimpleCompactTableManager<String,String>>("compact".to_string(), &mut wtr);
+        benchmark::<SimpleTableManager<String,String>>("simple".to_string(), &mut time_wtr, &mut space_wtr);
+        benchmark::<SimpleBloomTableManager<String,String>>("bloom".to_string(), &mut time_wtr, &mut space_wtr);
+        benchmark::<SimpleCacheTableManager<String,String>>("cache".to_string(), &mut time_wtr, &mut space_wtr);
+        benchmark::<SimpleCompactTableManager<String,String>>("compact".to_string(), &mut time_wtr, &mut space_wtr);
     }
 }

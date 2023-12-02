@@ -33,7 +33,7 @@ impl<K: LogSerial, V: LogSerial> TableManager<K, V> for SimpleCompactTableManage
         Ok(())
     }
 
-    fn read(&self, key: &K) -> Option<V> {
+    fn read(&mut self, key: &K) -> Option<V> {
         self.tm.read(key)
     }
 
